@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import time
 from typing import TYPE_CHECKING
@@ -12,10 +14,12 @@ from discord.ext import commands
 
 from ..constants import COLOR, COLOR_INFO, EMOJI
 from ..helpers import (
+    animated_progress,
     embed,
     error,
     humanize_duration,
     reply_ephemeral,
+    spinner,
     truncate,
 )
 from ..ui.builders import (
@@ -54,6 +58,43 @@ class Utilities(commands.Cog):
 
     def __init__(self, bot: "VesparaBot") -> None:
         self.bot = bot
+        self._presence_task: asyncio.Task[None] | None = None
+
+    async def cog_load(self) -> None:
+        self._presence_task = asyncio.create_task(
+            self._rotate_presence(), name="vespara-presence"
+        )
+
+    async def cog_unload(self) -> None:
+        if self._presence_task is not None:
+            self._presence_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._presence_task
+
+    async def _rotate_presence(self) -> None:
+        """Fait tourner la présence du bot toutes les 2 minutes (animation discrète)."""
+        activities = (
+            (discord.ActivityType.watching, "/menu · Vespara"),
+            (discord.ActivityType.listening, "/eco daily 🪙"),
+            (discord.ActivityType.playing, "au casino 🎲"),
+            (discord.ActivityType.watching, "les vocaux temporaires 🎧"),
+        )
+        index = 0
+        while True:
+            try:
+                await asyncio.sleep(120)
+                if not self.bot.is_ready():
+                    continue
+                kind, name = activities[index % len(activities)]
+                index += 1
+                await self.bot.change_presence(
+                    activity=discord.Activity(type=kind, name=name),
+                    status=discord.Status.online,
+                )
+            except asyncio.CancelledError:  # pragma: no cover - arrêt propre
+                raise
+            except Exception:  # pragma: no cover - jamais bloquant
+                log.debug("Rotation de présence impossible", exc_info=True)
 
     # ------------------------------------------------------------------ #
     # État du bot
@@ -61,21 +102,57 @@ class Utilities(commands.Cog):
     @app_commands.command(name="ping", description="Afficher la latence du bot")
     async def ping(self, interaction: discord.Interaction) -> None:
         started = time.perf_counter()
-        emb = embed(
-            title=f"{EMOJI['chart']} Pong !",
-            description="Calcul de la latence…",
-            color=COLOR_INFO,
+        await interaction.response.send_message(
+            embed=embed(
+                title=f"{spinner(0)} Ping…",
+                description="*Mesure de la latence en cours*",
+                color=COLOR_INFO,
+                accent="ocean",
+            ),
+            ephemeral=True,
         )
-        await interaction.response.send_message(embed=emb, ephemeral=True)
+
+        # Petite animation : on fait tourner le spinner une fraction de seconde.
+        for step in range(1, 3):
+            await asyncio.sleep(0.25)
+            with contextlib.suppress(discord.HTTPException):
+                await interaction.edit_original_response(
+                    embed=embed(
+                        title=f"{spinner(step)} Ping…",
+                        description=f"*Mesure de la latence{'·' * step}*",
+                        color=COLOR_INFO,
+                        accent="ocean",
+                    )
+                )
         elapsed = (time.perf_counter() - started) * 1000
 
+        latency = getattr(self.bot, "latency_ms", 0)
+        quality = (
+            f"{EMOJI['success']} excellente"
+            if 0 < latency < 120
+            else (f"{EMOJI['warning']} correcte" if latency < 300 else f"{EMOJI['error']} dégradée")
+            if latency
+            else f"{EMOJI['clock']} connexion en cours"
+        )
         final = embed(
             title=f"{EMOJI['chart']} Pong !",
+            description=(
+                f"### {latency} ms\n"
+                f"{animated_progress(1 - min(1.0, latency / 400) if latency else 0, 14)}\n"
+                f"Qualité de connexion : {quality}"
+            ),
             color=COLOR_INFO,
+            accent="ocean",
+            icon=EMOJI["chart"],
         )
-        final.add_field(name="Websocket", value=f"`{round(self.bot.latency * 1000)} ms`", inline=True)
+        final.add_field(name="Websocket", value=f"`{latency} ms`", inline=True)
         final.add_field(name="Aller-retour API", value=f"`{elapsed:.0f} ms`", inline=True)
         final.add_field(name="En ligne depuis", value=humanize_duration(self.bot.uptime), inline=True)
+        final.add_field(name="Serveurs", value=str(len(self.bot.guilds)), inline=True)
+        final.add_field(
+            name="Commandes", value=str(getattr(self.bot, "command_count", "—")), inline=True
+        )
+        final.add_field(name="Mémoire", value=f"{self.bot.memory_usage:.0f} Mo", inline=True)
         await interaction.edit_original_response(embed=final)
 
     @app_commands.command(name="botinfo", description="Informations sur le bot Vespara")

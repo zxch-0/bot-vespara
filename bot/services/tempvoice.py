@@ -39,7 +39,7 @@ from ..constants import (
     TEMPVOICE_NAME_TEMPLATE,
     TEMPVOICE_RECOVERY_MAX_CHANNELS,
 )
-from ..helpers import truncate, utcnow
+from ..helpers import progress_bar, truncate, utcnow
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..main import VesparaBot
@@ -305,10 +305,26 @@ def room_panel_embed(bot: "VesparaBot", channel: Any, record: dict[str, Any]) ->
     emb.set_footer(
         text=(
             f"{FOOTER} • {PANEL_MARKER}:{owner_id} • "
-            "Salon supprimé automatiquement quand il est vide"
+            f"Salon supprimé {int(TEMPVOICE_DELETE_GRACE)} s après être devenu vide"
         )
     )
     emb.timestamp = utcnow()
+    return emb
+
+
+def closing_embed(channel: Any, record: dict[str, Any], seconds: int) -> discord.Embed:
+    """Panneau affiché pendant le compte à rebours avant suppression du salon."""
+    emb = discord.Embed(
+        title=f"{EMOJI['clock']} Salon vide — fermeture dans {seconds} s",
+        description=(
+            "Personne n'est connecté dans ce vocal.\n\n"
+            f"{progress_bar(0.0, 12)}\n"
+            "Rejoins-le vite pour annuler la suppression !"
+        ),
+        color=COLOR_WARNING,
+    )
+    emb.add_field(name="Propriétaire", value=f"<@{int(record.get('owner_id') or 0)}>", inline=True)
+    emb.set_footer(text=f"{FOOTER} • Suppression automatique après {seconds} s")
     return emb
 
 
@@ -467,12 +483,30 @@ class TempVoiceManager:
 
         async def _later() -> None:
             try:
+                record = self.db.voice_room(channel_id)
+                channel = guild.get_channel(channel_id)
+
+                # Petit compte à rebours visuel sur le panneau (5 s par défaut).
+                if channel is not None and record is not None:
+                    with contextlib.suppress(discord.HTTPException, AttributeError):
+                        message_id = record.get("panel_message_id")
+                        if message_id:
+                            await channel.get_partial_message(int(message_id)).edit(
+                                embed=closing_embed(
+                                    channel, record, max(1, int(round(self.deletion_grace)))
+                                )
+                            )
+
                 await asyncio.sleep(self.deletion_grace)
                 channel = guild.get_channel(channel_id)
                 if channel is None:
                     self.db.remove_voice_room(channel_id)
                     return
                 if getattr(channel, "members", []):
+                    # Quelqu'un est revenu : on restaure le panneau normal.
+                    if record is not None:
+                        record = self.db.voice_room(channel_id) or record
+                        await self.refresh_panel(channel, record)
                     return
                 await self.delete_room(channel)
             except asyncio.CancelledError:  # pragma: no cover - arrêt propre

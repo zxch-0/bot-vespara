@@ -18,7 +18,10 @@ Il est **prêt à déployer sur [Render](https://render.com) via un Blueprint**
 | 💬 **Auto-responder** | Déclencheurs `contient` / `commence par` / `finit par` / `exact` / `regex`, sensibilité à la casse, réponse texte ou embed, activation, cooldown, test en direct | Staff |
 | 🎱 **Boule magique** | `/boule` (alias `/8ball`) : tu poses une question, la boule se secoue et répond — oui, peut-être ou non — avec 30 réponses, un bouton **Secouer à nouveau** et un cooldown anti-spam | Tout le monde |
 | 🎧 **Vocaux temporaires** | Le staff installe un salon générateur accessible à tous ; le rejoindre crée instantanément un vocal personnel avec un **panneau de gestion dans le chat du salon** : renommer, verrouiller, masquer, limiter les places, expulser, autoriser, transférer, récupérer, supprimer. Salon supprimé automatiquement quand il est vide, et **rattachement automatique** des vocaux existants après un redémarrage | Staff (installation) · tout le monde (utilisation) |
-| 🎛️ **Menu** | Panneau à boutons : profil, infos serveur, rôles, giveaways, règlement, vocaux, infos bot | Tout le monde |
+| 🪙 **Économie** | Coins, `/eco daily` (série bonus ×7), `/eco work`, virements, classements, **niveaux XP** par message avec rôles automatiques | Tout le monde (admin : `/eco-admin`) |
+| 🛒 **Boutique** | Articles configurables par les admins : rôles, coins, tickets ou récompenses libres, avec stock, limite par membre et niveau requis. Achat par menu déroulant ou `/boutique acheter` | Tout le monde (config : staff) |
+| 🎰 **Casino** | Blackjack interactif (tirer/rester/doubler/abandonner), machine à sous animée, roulette européenne et jeu de dés — mises de 10 à 50 000 coins | Tout le monde |
+| 🎛️ **Menu** | Panneau à boutons : profil, économie, giveaways, vocaux, casino, infos serveur, rôles, règlement, infos bot | Tout le monde |
 | 🧰 **Utilitaires** | `/ping`, `/botinfo`, `/userinfo`, `/avatar`, `/banner`, `/serverinfo`, `/roleinfo`, `/rules`, `/giveaways` | Tout le monde |
 | 🩺 **Web** | `/health` pour Render, page de statut publique autonome (aucun CDN) et `/api/status` en JSON | Public |
 
@@ -145,9 +148,10 @@ dans son chat.
 | 🗑️ **Supprimer** | Ferme le salon (avec confirmation) |
 | 🔄 **Actualiser** | Redemande le panneau s'il a été supprimé |
 
-4. le salon est **supprimé automatiquement** dès qu'il est vide (avec un délai de
-   quelques secondes pour éviter les fausses manipes) ; si le propriétaire part
-   alors que d'autres membres restent, la propriété est **transférée**.
+4. le salon est **supprimé automatiquement 5 secondes** après être devenu vide
+   (compte à rebours animé affiché sur le panneau, annulé si quelqu'un revient) ;
+   si le propriétaire part alors que d'autres membres restent, la propriété est
+   **transférée**.
 
 ### Commandes staff
 
@@ -182,6 +186,95 @@ perdue. Les vocaux encore rattachés n'ont donc plus besoin d'être recréés.
 > 🔑 **Permissions du bot nécessaires :** *Gérer les salons*, *Déplacer des
 > membres* et *Envoyer des messages*. Le panneau et les boutons étant
 > **persistants**, ils fonctionnent encore après un redémarrage du bot.
+
+---
+
+## 🪙 Économie, niveaux et boutique
+
+Chaque membre possède un compte par serveur : **coins**, **XP / niveau**,
+inventaire et statistiques de jeu.
+
+### Gagner des coins
+
+| Source | Détail |
+| --- | --- |
+| `/eco daily` | Récompense journalière : **150 coins** + 50 par jour de série (multiplicateur jusqu'à ×2,5 au bout de 7 jours) |
+| `/eco work` | Petit boulot toutes les heures : **40 à 160 coins** |
+| Discussion | XP à chaque message (**12 à 26 XP**, une fois toutes les 45 s) → coins bonus à chaque niveau |
+| Casino | Blackjack, machine à sous, roulette et dés |
+| Boutique | Certains articles donnent directement des coins |
+
+### Niveaux
+
+- Courbe d'XP : `120 × niveau^1,45` (niveau 1 → 2 : 120 XP, niveau 10 : ~2 700 XP).
+- Chaque passage de niveau offre **25 × niveau** coins et peut débloquer un **rôle
+  automatique** configuré par le staff.
+- Les annonces de niveau sont animées (barre de progression, confettis) et peuvent
+  être envoyées dans un salon dédié.
+
+### Commandes publiques
+
+| Commande | Description |
+| --- | --- |
+| `/eco profil [membre]` | Carte de profil complète (solde, niveau, rang, casino) |
+| `/eco solde [membre]` | Solde en un coup d'œil |
+| `/eco niveau [membre]` | Progression détaillée + prochaines récompenses |
+| `/eco classement [par]` | Top 100 coins ou XP (paginé, podium 🥇🥈🥉) |
+| `/eco daily` · `/eco work` | Récompenses périodiques |
+| `/eco payer <membre> <montant>` | Virement (`1k`, `2.5k`, `1 000`…) |
+| `/boutique voir` | Boutique interactive (menu déroulant + confirmation) |
+| `/boutique acheter <article>` | Achat direct (autocomplétion) |
+| `/boutique inventaire` | Tes achats |
+
+### Commandes staff (`/eco-admin`)
+
+| Commande | Description |
+| --- | --- |
+| `donner` / `retirer` | Créditer ou débiter un membre |
+| `xp` | Ajouter de l'XP (déclenche niveaux et rôles) |
+| `article-ajouter` | Ajouter un article : `type` (`role`, `coins`, `ticket`, `custom`), prix, rôle, stock, niveau requis, limite par membre |
+| `article-modifier` / `article-supprimer` / `article-liste` | Gérer le catalogue |
+| `recompense <niveau> <rôle>` | Attribuer automatiquement un rôle à un niveau (`retirer:True` pour supprimer) |
+| `parametres` | XP par message on/off, multiplicateur, salon d'annonce, salon du casino |
+| `reinitialiser <membre>` | Remettre un compte à zéro |
+| `etat` | Statistiques globales (coins en circulation, podium, articles) |
+
+> 🔒 `/eco-admin` est réservé au staff (même mécanisme de visibilité que les
+> autres commandes de gestion).
+
+---
+
+## 🎰 Casino
+
+| Jeu | Commande | Gains |
+| --- | --- | --- |
+| 🃏 **Blackjack** | `/casino blackjack <mise>` | ×2 en cas de victoire, **×2,5** sur blackjack naturel, égalité remboursée, abandon = moitié rendue |
+| 🎰 **Machine à sous** | `/casino slots <mise>` | 3 identiques **×12** (trois 7️⃣ : ×24), 2 identiques ×2,2 |
+| 🎡 **Roulette** | `/casino roulette <mise> <pari>` | rouge/noir, pair/impair, bas/haut ×2 · vert (0) ×14 · numéro exact ×36 |
+| 🎲 **Dés** | `/casino des <mise> <pari>` | somme paire/impaire ×2 · 7 exact ×6 · double ×8 |
+
+- `/casino accueil` : présentation avec boutons de raccourcis ;
+- `/casino jeux` : tableau complet des paris et multiplicateurs ;
+- `/casino mise-max [jeu]` : miser tout son solde d'un coup ;
+- mises **10 → 50 000 coins**, parties **100 % éphémères** (personne d'autre ne voit
+  tes cartes), boutons du blackjack avec timeout automatique ;
+- animations : rouleaux qui défilent, bille qui tourne, dés qui roulent, cartes
+  révélées, barres de progression animées.
+
+---
+
+## 🎨 Interface & animations
+
+- **Thème à dégradés** (`violet`, `menthe`, `or`, `ocean`, `rose`, `feu`, `nuit`) :
+  chaque embed choisit son ambiance via `embed(..., accent="menthe")`.
+- **Barres de progression animées** (`animated_progress`, `percent_bar`) : XP,
+  giveaways, compte à rebours des vocaux.
+- **Sélecteurs et spinners** (`spinner`, `typing_dots`) : `/ping` mesure la latence
+  en animant le calcul, les machines à sous font défiler les rouleaux.
+- **Présence tournante** du bot toutes les 2 minutes.
+- **Badges de niveau** (🌱 → 🌌) et podium de classement (🥇🥈🥉).
+- Performance : seuils d'XP précalculés (`bisect`), conversions de niveau en
+  O(log n), sauvegardes JSON regroupées, cache des embeds coûteux.
 
 ---
 
@@ -253,13 +346,19 @@ ruff check .            # pip install ruff
 Astuce : ajoute ces deux commandes dans une GitHub Action pour lancer les
 tests automatiquement à chaque push.
 
-118 tests couvrent l'analyse des durées, les modes de l'auto-responder, la base
+192 tests couvrent l'analyse des durées, les modes de l'auto-responder, la base
 JSON, la page de statut, la structure des commandes (visibilité staff incluse),
 le cycle de vie complet d'un giveaway (création, participation, tirage, relance,
 suppression), la boule magique (tirage, embeds, bouton et cooldowns) et les
 vocaux temporaires (création au join, permissions, panneau de gestion, expulsion,
 transfert, récupération, suppression automatique, **rattachement des salons après
-perte de la base**), avec des objets Discord simulés.
+perte de la base**), l'**économie** (courbe d'XP, daily/work, virements, boutique,
+classements, récompenses de niveau) et le **casino** (distributions, as, blackjack,
+double, abandon, jackpots, couleurs et paris de la roulette, dés), avec des objets
+Discord simulés.
+
+Un script de fumée (`tests/test_smoke.py`) exécute **toutes les commandes** avec des
+interactions simulées pour détecter les erreurs de rendu.
 
 ### Arborescence
 
@@ -280,11 +379,15 @@ bot/
 │   ├── utilities.py     # commandes publiques
 │   ├── fun.py           # /boule et /8ball
 │   ├── settings.py      # /config ... et /staffrole
-│   └── tempvoice.py     # /vocal ... (vocaux temporaires)
+│   ├── tempvoice.py     # /vocal ... (vocaux temporaires)
+│   ├── economy.py       # /eco, /boutique et /eco-admin
+│   └── casino.py        # /casino (blackjack, slots, roulette, dés)
 ├── services/
 │   ├── giveaways.py     # logique des giveaways (tirages, refresh, reroll)
 │   ├── magic_ball.py    # tirage et embeds de la boule magique
-│   └── tempvoice.py     # création/suppression et gestion des vocaux temporaires
+│   ├── tempvoice.py     # création/suppression et gestion des vocaux temporaires
+│   ├── economy.py       # comptes, XP/niveaux, boutique, classements
+│   └── casino.py        # blackjack, machine à sous, roulette, dés (logique pure)
 └── ui/                    # vues, modals, pagination, embeds
 ```
 
@@ -305,7 +408,10 @@ bot/
 | `/serverinfo` | Informations du serveur |
 | `/roleinfo <rôle>` | Détails d'un rôle |
 | `/boule <question>` · `/8ball` | Pose une question à la boule magique 🎱 |
-| `/ping` · `/botinfo` | Latence et état du bot |
+| `/ping` · `/botinfo` | Latence (animée) et état du bot |
+| `/eco profil` · `/eco solde` · `/eco niveau` · `/eco classement` · `/eco daily` · `/eco work` · `/eco payer` | Économie et niveaux |
+| `/boutique voir` · `/boutique acheter` · `/boutique inventaire` | Boutique |
+| `/casino accueil` · `/casino blackjack` · `/casino slots` · `/casino roulette` · `/casino des` · `/casino jeux` · `/casino mise-max` | Casino |
 
 ### Staff (`/giveaway`, `/annonce`, `/autoresponder`, `/config`)
 
@@ -323,6 +429,7 @@ bot/
 | `/config salon-annonces [salon]` | Salon par défaut des annonces |
 | `/config reglement [reinitialiser]` | Édite le règlement |
 | `/config menu [salon]` | Publie le panneau du menu |
+| `/eco-admin donner/retirer/xp/article-*/recompense/parametres/reinitialiser/etat` | Économie, boutique et niveaux |
 | `/vocal installer` · `etat` · `modele` · `limite` · `rattacher` · `nettoyer` · `desactiver` | Vocaux temporaires (voir [Vocaux temporaires](#-vocaux-temporaires-crée-ton-vocal)) |
 | `/staffrole [rôle]` | Définit le rôle staff (admin) |
 
@@ -365,6 +472,9 @@ Les réponses se personnalisent dans `bot/constants.py` → `MAGIC8BALL_ANSWERS`
 | Les membres ne sont pas déplacés dans leur vocal | Donne au bot la permission **Déplacer des membres** |
 | Les vocaux « se détachent » (0 vocal actif alors que des salons existent) | Lance `/vocal rattacher` : le bot relit les panneaux et rattache les salons. C'est automatique au démarrage et au clic sur un bouton. Sur Render gratuit, la base est éphémère → voir [Persistance](#-persistance-des-données) |
 | Le panneau d'un vocal a été supprimé | Le propriétaire clique sur **Actualiser**, ou un staff lance `/vocal nettoyer` |
+| Les membres ne gagnent pas d'XP | Vérifie `/eco-admin parametres` (XP par message activée, multiplicateur) |
+| La boutique est vide | Ajoute un article : `/eco-admin article-ajouter` |
+| `/eco-admin` n'apparaît pas | Commande staff : voir [Visibilité](#-visibilité-des-commandes-staff) |
 | Le bot perd ses données | Offre gratuite Render : voir [Persistance](#-persistance-des-données) |
 | Le bot est en veille | Offre gratuite Render : `SELF_PING=true` aide à le garder éveillé, sans garantie (Render peut aussi redémarrer une instance gratuite à tout moment) |
 | `Invalid token` | Token régénéré ou mal copié → mets à jour `DISCORD_TOKEN` |

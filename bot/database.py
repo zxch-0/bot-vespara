@@ -29,6 +29,7 @@ DEFAULT_DATA: dict[str, Any] = {
     "giveaways": {},
     "autoresponses": {},
     "voice_rooms": {},
+    "users": {},
 }
 
 DEFAULT_GUILD: dict[str, Any] = {
@@ -44,6 +45,14 @@ DEFAULT_GUILD: dict[str, Any] = {
     "voice_category_id": None,
     "voice_name_template": None,
     "voice_limit": 0,
+    # Économie / niveaux / boutique
+    "xp_enabled": True,
+    "xp_rate": 1.0,
+    "levelup_channel_id": None,
+    "levelup_enabled": True,
+    "shop_items": [],
+    "level_rewards": [],
+    "casino_channel_id": None,
 }
 
 
@@ -279,7 +288,25 @@ class Database:
             "active_giveaways": len(self.active_giveaways()),
             "autoresponses": sum(len(v) for v in self.data["autoresponses"].values()),
             "voice_rooms": len(self.voice_rooms()),
+            "accounts": len(self.data.get("users", {})),
         }
+
+    # ------------------------------------------------------------------ #
+    # Économie
+    # ------------------------------------------------------------------ #
+    def users(self) -> dict[str, dict[str, Any]]:
+        return self.data.setdefault("users", {})
+
+    def user(self, guild_id: int, user_id: int) -> dict[str, Any] | None:
+        return self.users().get(f"{int(guild_id)}:{int(user_id)}")
+
+    def total_coins(self, guild_id: int) -> int:
+        prefix = f"{int(guild_id)}:"
+        return sum(
+            int(record.get("coins") or 0)
+            for key, record in self.users().items()
+            if key.startswith(prefix)
+        )
 
     @staticmethod
     def new_token_id() -> str:

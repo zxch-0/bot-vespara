@@ -54,6 +54,7 @@ class VesparaBot(commands.Bot):
         self.web = StatusServer(self)
         self.giveaway_manager: Any = None  # injecté par le cog giveaways
         self.tempvoice: Any = None  # injecté par le cog tempvoice
+        self.economy: Any = None  # injecté par le cog economy
         self._startup_logged = False
 
     # ------------------------------------------------------------------ #
@@ -62,6 +63,24 @@ class VesparaBot(commands.Bot):
     @property
     def uptime(self) -> float:
         return max(0.0, (utcnow() - self.started_at).total_seconds())
+
+    @property
+    def latency_ms(self) -> int:
+        """Latence websocket en ms — `0` tant que le heartbeat n'a pas répondu."""
+        latency = self.latency
+        if latency != latency or latency <= 0:  # NaN / non connecté
+            return 0
+        return round(latency * 1000)
+
+    @property
+    def memory_usage(self) -> float:
+        """Mémoire résidente du process (Mo) — 0 si indisponible."""
+        try:
+            import resource
+
+            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+        except Exception:  # pragma: no cover - systèmes sans resource
+            return 0.0
 
     @property
     def command_count(self) -> int:
@@ -173,8 +192,16 @@ class VesparaBot(commands.Bot):
             log.info("=" * 62)
 
         with contextlib.suppress(discord.HTTPException):
+            # Présence tournante : un peu de vie sur la page du serveur.
+            activities = (
+                discord.Game(name="/menu · Vespara"),
+                discord.Activity(type=discord.ActivityType.watching, name=f"{len(self.guilds)} serveur(s)"),
+                discord.Activity(type=discord.ActivityType.listening, name="/eco daily 🪙"),
+                discord.Activity(type=discord.ActivityType.playing, name="au casino 🎲"),
+            )
+            self._presence_index = (getattr(self, "_presence_index", 0) + 1) % len(activities)
             await self.change_presence(
-                activity=discord.Game(name="/menu · Vespara"), status=discord.Status.online
+                activity=activities[self._presence_index], status=discord.Status.online
             )
 
     async def on_guild_join(self, guild: discord.Guild) -> None:
@@ -196,14 +223,16 @@ class VesparaBot(commands.Bot):
         emb = embed(
             title=f"{EMOJI['wave']} Merci de m'avoir ajouté sur {guild.name} !",
             description=(
-                "Je gère les **giveaways**, les **annonces**, les **réponses automatiques** et "
-                "les **vocaux temporaires**, et je propose un **menu** avec plein de petites "
-                "commandes utiles.\n\n"
+                "Je gère les **giveaways**, les **annonces**, les **réponses automatiques**, "
+                "les **vocaux temporaires**, l'**économie avec niveaux et boutique** et même "
+                "un **casino** — le tout derrière un **menu** clair.\n\n"
                 "**Pour commencer**\n"
                 "• `/menu` — afficher le menu du serveur\n"
                 "• `/staffrole` — définir le rôle staff (administrateur)\n"
                 "• `/config voir` — vérifier la configuration\n"
-                "• `/vocal installer` — activer les vocaux personnels\n\n"
+                "• `/vocal installer` — activer les vocaux personnels\n"
+                "• `/eco-admin article-ajouter` — remplir la boutique\n"
+                "• `/eco-admin recompense` — rôles débloqués par niveau\n\n"
                 "*Les commandes de gestion sont réservées au rôle staff.*"
             ),
             color=COLOR,

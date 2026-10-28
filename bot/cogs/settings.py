@@ -138,6 +138,15 @@ class ConfigGroup(app_commands.Group, name="config", description="Configurer le 
             ),
             inline=True,
         )
+        economy_items = db.guild(guild.id).get("shop_items") or []
+        emb.add_field(
+            name="Économie",
+            value=(
+                f"{len(economy_items)} article(s) · "
+                f"{len(db.guild(guild.id).get('level_rewards') or [])} récompense(s) de niveau"
+            ),
+            inline=True,
+        )
         emb.add_field(
             name="Commandes",
             value=(
@@ -145,6 +154,7 @@ class ConfigGroup(app_commands.Group, name="config", description="Configurer le 
                 "`/config reglement` · éditer le règlement\n"
                 "`/config menu` · publier le panneau du menu\n"
                 "`/vocal installer` · installer les vocaux temporaires\n"
+                "`/eco-admin etat` · économie, boutique et niveaux\n"
                 "`/staffrole` · définir le rôle staff (admin)"
             ),
             inline=False,

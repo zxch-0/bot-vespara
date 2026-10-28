@@ -29,6 +29,21 @@ if TYPE_CHECKING:  # pragma: no cover
 
 log = logging.getLogger(__name__)
 
+
+def _latency_ms(bot: Any) -> int:
+    """Latence websocket en ms, insensible aux valeurs NaN / négatives."""
+    latency_ms = getattr(bot, "latency_ms", None)
+    if isinstance(latency_ms, int) and latency_ms >= 0:
+        return latency_ms
+    latency = getattr(bot, "latency", 0) or 0
+    try:
+        value = float(latency)
+    except (TypeError, ValueError):  # pragma: no cover - latence exotique
+        return 0
+    if value != value or value <= 0:  # NaN ou non connecté
+        return 0
+    return round(value * 1000)
+
 INDEX_HTML = """<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -283,8 +298,18 @@ class StatusServer:
         except Exception:  # pragma: no cover - page de statut jamais fatale
             stats = {"active_giveaways": 0, "autoresponses": 0}
 
+        total_coins = 0
+        economy = getattr(bot, "economy", None)
+        if ready and economy is not None:
+            try:
+                total_coins = sum(
+                    economy.db.total_coins(guild.id) for guild in bot.guilds
+                )
+            except Exception:  # pragma: no cover - page de statut jamais fatale
+                total_coins = 0
+
         users = sum(guild.member_count or 0 for guild in bot.guilds) if ready else 0
-        latency = round(bot.latency * 1000) if ready else 0
+        latency = _latency_ms(bot) if ready else 0
         uptime = bot.uptime
         return {
             "status": "online" if ready else ("starting" if bot.user is None else "offline"),
@@ -298,6 +323,9 @@ class StatusServer:
             "commands": getattr(bot, "command_count", None) or len(bot.tree.get_commands()),
             "giveaways": stats.get("active_giveaways", 0),
             "autoresponses": stats.get("autoresponses", 0),
+            "voice_rooms": stats.get("voice_rooms", 0),
+            "accounts": stats.get("accounts", 0),
+            "coins": total_coins,
             "python": platform.python_version(),
             "discord_py": discord.__version__,
         }
