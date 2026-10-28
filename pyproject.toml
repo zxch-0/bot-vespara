@@ -1,0 +1,19 @@
+[project]
+name = "vespara-bot"
+version = "1.0.0"
+description = "Bot Discord Vespara : giveaways, annonces, réponses automatiques et menu communautaire"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [".venv", "data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "C4", "I", "UP"]
+# Les messages utilisateur sont en français et souvent plus longs qu'une ligne.
+ignore = ["E501", "UP037", "UP035", "UP017"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]

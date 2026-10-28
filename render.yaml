@@ -1,0 +1,57 @@
+# ---------------------------------------------------------------------------
+# Render Blueprint — bot Discord Vespara
+#
+# Déploiement : Render Dashboard → New + → Blueprint → sélectionne ce dépôt.
+# Render lit ce fichier, crée le service web et demande les secrets marqués
+# `sync: false` (DISCORD_TOKEN, GUILD_ID, STAFF_ROLE_ID...).
+#
+# ⚠️ Persistance : l'offre gratuite de Render n'accepte PAS les disques.
+#    Les données (giveaways, réponses auto, config) sont donc perdues à chaque
+#    redéploiement / redémarrage. Pour les conserver :
+#      1. passe `plan: free` à `plan: starter` ;
+#      2. décommente le bloc `disk:` en fin de fichier ;
+#      3. garde DATABASE_PATH=/var/data/vespara.json.
+# ---------------------------------------------------------------------------
+services:
+  - type: web
+    name: vespara-bot
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python run.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+
+      # --- Secrets à renseigner pendant la création du Blueprint -------------
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: GUILD_ID
+        sync: false
+      - key: STAFF_ROLE_ID
+        sync: false
+      - key: LOG_CHANNEL_ID
+        sync: false
+
+      # --- Réglages facultatifs ---------------------------------------------
+      # Permission que doit posséder le rôle staff pour voir les commandes.
+      - key: STAFF_PERMISSION
+        value: manage_guild
+      # guild = commandes instantanées sur GUILD_ID, global = partout (1 h de cache)
+      - key: COMMAND_SCOPE
+        value: guild
+      # Fichier de données. Sur un disque Render, utiliser /var/data/vespara.json
+      - key: DATABASE_PATH
+        value: data/vespara.json
+      - key: SELF_PING
+        value: "true"
+      - key: LOG_LEVEL
+        value: INFO
+
+    # Décommente ce bloc après être passé sur un plan payant (voir ci-dessus).
+    # disk:
+    #   name: vespara-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
