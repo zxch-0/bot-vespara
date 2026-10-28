@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 import discord
@@ -31,10 +32,12 @@ from ..constants import (
     TEMPVOICE_DEFAULT_LIMIT,
     TEMPVOICE_DELETE_GRACE,
     TEMPVOICE_HUB_MESSAGE,
+    TEMPVOICE_HUB_NAME,
     TEMPVOICE_MAX_LIMIT,
     TEMPVOICE_MAX_ROOMS,
     TEMPVOICE_NAME_MAX_LENGTH,
     TEMPVOICE_NAME_TEMPLATE,
+    TEMPVOICE_RECOVERY_MAX_CHANNELS,
 )
 from ..helpers import truncate, utcnow
 
@@ -45,6 +48,15 @@ if TYPE_CHECKING:  # pragma: no cover
 log = logging.getLogger(__name__)
 
 PANEL_TITLE = "Panneau de gestion"
+
+# Marqueur machine lisible ajouté dans le pied du panneau : il permet au bot de
+# retrouver (ou de retrouver le propriétaire d') un salon même si la base a été
+# perdue (redéploiement, disque éphémère…).
+PANEL_MARKER = "vespara:temproom"
+PANEL_COMPONENT_PREFIX = "vespara:tv:"
+
+_MARKER_RE = re.compile(r"vespara:temproom:(\d+)")
+_MENTION_RE = re.compile(r"<@!?(\d+)>")
 
 
 # --------------------------------------------------------------------------- #
@@ -72,6 +84,86 @@ def format_room_name(template: str | None, member: Any, count: int = 0) -> str:
 
     name = " ".join(name.split()).strip() or f"Vocal de {display}"
     return name[:TEMPVOICE_NAME_MAX_LENGTH]
+
+
+def is_panel_message(message: Any) -> bool:
+    """Ce message est-il un panneau de gestion de vocal temporaire ?"""
+    for row in getattr(message, "components", None) or []:
+        for child in getattr(row, "children", None) or []:
+            custom_id = getattr(child, "custom_id", "") or ""
+            if custom_id.startswith(PANEL_COMPONENT_PREFIX):
+                return True
+    return False
+
+
+def parse_panel_owner(embeds: Any) -> int | None:
+    """Retrouve l'identifiant du propriétaire depuis un panneau existant."""
+    for emb in embeds or []:
+        footer = getattr(getattr(emb, "footer", None), "text", None) or ""
+        match = _MARKER_RE.search(footer)
+        if match:
+            return int(match.group(1))
+        for field in getattr(emb, "fields", []) or []:
+            if "Propriétaire" in (field.name or ""):
+                mention = _MENTION_RE.search(field.value or "")
+                if mention:
+                    return int(mention.group(1))
+    return None
+
+
+def owner_from_overwrites(channel: Any) -> int | None:
+    """Déduit le propriétaire : premier membre avec « Gérer le salon »."""
+    for target, overwrite in (getattr(channel, "overwrites", None) or {}).items():
+        if not hasattr(target, "bot"):  # rôle ou membre du bot : on ignore
+            continue
+        if getattr(target, "bot", False):
+            continue
+        if getattr(overwrite, "manage_channels", False):
+            return int(target.id)
+    return None
+
+
+def record_from_channel(
+    channel: Any, owner_id: int, *, panel_message_id: int | None = None
+) -> dict[str, Any]:
+    """Reconstruit la fiche d'un salon à partir de son état Discord réel."""
+    guild = getattr(channel, "guild", None)
+    default_role = getattr(guild, "default_role", None)
+    bot_user = getattr(getattr(guild, "me", None), "id", None)
+
+    locked = False
+    hidden = False
+    denied: list[int] = []
+    allowed: list[int] = []
+
+    for target, overwrite in (getattr(channel, "overwrites", None) or {}).items():
+        if default_role is not None and target is default_role:
+            locked = getattr(overwrite, "connect", None) is False
+            hidden = getattr(overwrite, "view_channel", None) is False
+            continue
+        if not hasattr(target, "bot"):
+            continue
+        if getattr(target, "id", None) in {owner_id, bot_user}:
+            continue
+        if getattr(overwrite, "connect", None) is False:
+            denied.append(int(target.id))
+        elif getattr(overwrite, "connect", None) is True:
+            allowed.append(int(target.id))
+
+    return {
+        "channel_id": int(getattr(channel, "id", 0)),
+        "guild_id": int(getattr(guild, "id", 0)),
+        "owner_id": int(owner_id),
+        "panel_message_id": int(panel_message_id) if panel_message_id else None,
+        "created_at": utcnow().timestamp(),
+        "locked": locked,
+        "hidden": hidden,
+        "limit": int(getattr(channel, "user_limit", 0) or 0),
+        "denied": sorted(set(denied)),
+        "allowed": sorted(set(allowed)),
+        "name": str(getattr(channel, "name", "") or ""),
+        "recovered": True,
+    }
 
 
 def room_state_label(record: dict[str, Any]) -> str:
@@ -210,7 +302,12 @@ def room_panel_embed(bot: "VesparaBot", channel: Any, record: dict[str, Any]) ->
         ),
         inline=False,
     )
-    emb.set_footer(text=f"{FOOTER} • Salon supprimé automatiquement quand il est vide")
+    emb.set_footer(
+        text=(
+            f"{FOOTER} • {PANEL_MARKER}:{owner_id} • "
+            "Salon supprimé automatiquement quand il est vide"
+        )
+    )
     emb.timestamp = utcnow()
     return emb
 
@@ -333,6 +430,8 @@ class TempVoiceManager:
 
             record["channel_id"] = channel.id
             self.db.add_voice_room(record)
+            # Sauvegarde immédiate : un redémarrage ne doit pas « détacher » le salon.
+            await self.db.save()
 
         log.info("Salon temporaire créé : %s (%s) pour %s", channel.name, channel.id, member)
 
@@ -347,6 +446,7 @@ class TempVoiceManager:
         record = self.room(channel)
         channel_id = self._channel_id(channel)
         self.db.remove_voice_room(int(channel_id))
+        await self.db.save()
         task = self._deletion_tasks.pop(int(channel_id), None)
         if task is not None and not task.done():
             task.cancel()
@@ -388,6 +488,144 @@ class TempVoiceManager:
         task = self._deletion_tasks.pop(int(channel_id), None)
         if task is not None and not task.done():
             task.cancel()
+
+    # ------------------------------------------------------------------ #
+    # Rattachement automatique (résilience)
+    # ------------------------------------------------------------------ #
+    async def find_panel_message(self, channel: Any) -> Any | None:
+        """Cherche le panneau de gestion dans l'historique du chat du vocal."""
+        history = getattr(channel, "history", None)
+        if history is None:
+            return None
+        bot_id = getattr(getattr(self.bot, "user", None), "id", None)
+        try:
+            async for message in history(limit=50):
+                author = getattr(message, "author", None)
+                if bot_id is not None and getattr(author, "id", None) != bot_id:
+                    continue
+                if is_panel_message(message):
+                    return message
+        except (discord.HTTPException, AttributeError, TypeError, KeyError):
+            log.debug("Historique du salon %s illisible", getattr(channel, "id", "?"), exc_info=True)
+        return None
+
+    async def adopt(
+        self, channel: Any, *, message: Any | None = None, save: bool = True
+    ) -> dict[str, Any] | None:
+        """Rattache un salon existant au système quand sa fiche a été perdue.
+
+        Le propriétaire est relu dans le panneau (ou déduit des permissions),
+        l'état (verrouillé / privé / places / expulsions) est reconstruit depuis
+        le salon Discord : un redéploiement ne casse donc plus les vocaux.
+        """
+        if self.is_managed(channel):
+            return self.room(channel)
+
+        guild = getattr(channel, "guild", None)
+        if guild is None:
+            return None
+
+        hub_id = self.hub_id(guild.id)
+        if hub_id is None or self._channel_id(channel) == hub_id:
+            return None
+
+        panel = message if message is not None and is_panel_message(message) else None
+        if panel is None:
+            panel = await self.find_panel_message(channel)
+
+        owner_id = parse_panel_owner(getattr(panel, "embeds", None) or []) if panel else None
+        if owner_id is None:
+            owner_id = owner_from_overwrites(channel)
+        if owner_id is None:
+            log.info("Salon %s ignoré : impossible d'identifier un propriétaire", getattr(channel, "id", "?"))
+            return None
+
+        record = record_from_channel(channel, owner_id, panel_message_id=getattr(panel, "id", None))
+        record["name"] = str(getattr(channel, "name", "") or "")
+        self.db.add_voice_room(record)
+        if save:
+            await self.db.save()
+        log.warning(
+            "Salon temporaire rattaché : %s (%s) — propriétaire %s (%s)",
+            record["name"],
+            record["channel_id"],
+            owner_id,
+            "panneau retrouvé" if panel else "déduit des permissions",
+        )
+        await self.refresh_panel(channel, record)
+        return record
+
+    def candidate_channels(self, guild: discord.Guild) -> list[Any]:
+        """Salons vocaux susceptibles d'être d'anciens vocaux temporaires."""
+        hub = self.hub(guild)
+        hub_id = getattr(hub, "id", None) or self.hub_id(guild.id)
+        config = self.config(guild.id)
+
+        category_id = config.get("voice_category_id")
+        if not category_id:
+            category = getattr(hub, "category", None)
+            category_id = getattr(category, "id", None)
+
+        candidates: list[Any] = []
+        for channel in getattr(guild, "voice_channels", []) or []:
+            if getattr(channel, "id", None) == hub_id:
+                continue
+            if self.is_managed(channel):
+                continue
+            if category_id:
+                channel_category = getattr(channel, "category", None)
+                channel_category_id = getattr(channel_category, "id", None)
+                if channel_category_id is not None and channel_category_id != int(category_id):
+                    continue
+                if channel_category_id is None and getattr(channel, "category", None) is not None:
+                    continue
+            candidates.append(channel)
+            if len(candidates) >= TEMPVOICE_RECOVERY_MAX_CHANNELS:
+                break
+        return candidates
+
+    async def recover_hub(self, guild: discord.Guild) -> Any | None:
+        """Retrouve le salon générateur si sa configuration a été perdue."""
+        hub = self.hub(guild)
+        if hub is not None:
+            return hub
+
+        config = self.config(guild.id)
+        expected = (config.get("voice_hub_name") or TEMPVOICE_HUB_NAME).strip()
+        match = None
+        for channel in getattr(guild, "voice_channels", []) or []:
+            if getattr(channel, "name", "") == expected:
+                match = channel
+                break
+        if match is None:
+            return None
+
+        config["voice_hub_id"] = match.id
+        config["voice_hub_name"] = expected
+        await self.db.save()
+        log.warning("Salon générateur retrouvé par son nom : %s (%s)", expected, match.id)
+        return match
+
+    async def recover_guild(self, guild: discord.Guild) -> dict[str, Any]:
+        """Rattache tous les vocaux orphelins d'un serveur."""
+        await self.recover_hub(guild)
+        if self.hub_id(guild.id) is None:
+            return {"adopted": 0, "scanned": 0, "records": []
+
+            }
+
+        candidates = self.candidate_channels(guild)
+        records: list[dict[str, Any]] = []
+        for channel in candidates:
+            try:
+                record = await self.adopt(channel, save=False)
+                if record is not None:
+                    records.append(record)
+            except Exception:  # pragma: no cover - un salon ne doit rien bloquer
+                log.exception("Rattachement impossible pour %s", getattr(channel, "id", "?"))
+        if records:
+            await self.db.save()
+        return {"adopted": len(records), "scanned": len(candidates), "records": records}
 
     # ------------------------------------------------------------------ #
     # Panneau
@@ -437,8 +675,12 @@ class TempVoiceManager:
         except discord.HTTPException:
             log.warning("Permissions du salon %s non appliquées", getattr(channel, "id", "?"), exc_info=True)
 
-    def _save(self) -> None:
-        self.db.schedule_save(0.5)
+    def _save(self, *, now: bool = False) -> None:
+        """Sauvegarde la base (immédiate pour les changements structurants)."""
+        if now:
+            self.db.schedule_save(0)
+        else:
+            self.db.schedule_save(0.5)
 
     # ------------------------------------------------------------------ #
     # Actions du propriétaire
@@ -504,7 +746,7 @@ class TempVoiceManager:
         record["owner_id"] = member.id
         record["denied"] = [int(uid) for uid in record.get("denied", []) if int(uid) != member.id]
         await self.sync_permissions(channel, record)
-        self._save()
+        self._save(now=True)
         await self.refresh_panel(channel, record)
 
     async def claim(self, channel: Any, record: dict[str, Any], member: discord.Member) -> None:

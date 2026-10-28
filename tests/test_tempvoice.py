@@ -25,12 +25,32 @@ from bot.services.tempvoice import (
 # --------------------------------------------------------------------------- #
 # Doubles de test
 # --------------------------------------------------------------------------- #
+class FakeComponent:
+    def __init__(self, custom_id: str) -> None:
+        self.custom_id = custom_id
+
+
+class FakeRow:
+    def __init__(self, *custom_ids: str) -> None:
+        self.children = [FakeComponent(custom_id) for custom_id in custom_ids]
+
+
 class FakeMessage:
-    def __init__(self, message_id: int) -> None:
+    def __init__(
+        self,
+        message_id: int,
+        *,
+        author: Any = None,
+        embeds: list[Any] | None = None,
+        components: list[Any] | None = None,
+    ) -> None:
         self.id = message_id
         self.edits: list[dict[str, Any]] = []
         self.deleted = False
         self.jump_url = f"https://discord.test/{message_id}"
+        self.author = author or types.SimpleNamespace(id=0)
+        self.embeds = embeds or []
+        self.components = components or []
 
     async def edit(self, **kwargs: Any) -> "FakeMessage":
         self.edits.append(kwargs)
@@ -126,13 +146,26 @@ class FakeVoiceChannel:
 
     async def send(self, **kwargs: Any) -> FakeMessage:
         self._counter += 1
-        message = FakeMessage(self._counter)
+        view = kwargs.get("view")
+        components = [
+            FakeRow(*[item.custom_id for item in getattr(view, "children", []) if getattr(item, "custom_id", None)])
+        ] if view is not None else []
+        message = FakeMessage(
+            self._counter,
+            author=getattr(getattr(self, "guild", None), "me", None),
+            embeds=[kwargs["embed"]] if kwargs.get("embed") else [],
+            components=components,
+        )
         self._messages[message.id] = message
         self.sent.append(kwargs)
         return message
 
     async def fetch_message(self, message_id: int) -> FakeMessage:
         return self._messages[message_id]
+
+    async def history(self, limit: int = 50):
+        for message in list(self._messages.values())[-limit:]:
+            yield message
 
     def get_partial_message(self, message_id: int) -> FakeMessage:
         return FakePartialMessage(self, message_id)
@@ -162,6 +195,10 @@ class FakeGuild:
         self.channels: dict[int, Any] = {}
         self.members_by_id: dict[int, FakeMember] = {999: self.me}
         self._next_id = 1000
+
+    @property
+    def voice_channels(self) -> list[Any]:
+        return [channel for channel in self.channels.values() if isinstance(channel, FakeVoiceChannel)]
 
     def get_channel(self, channel_id: int) -> Any | None:
         return self.channels.get(int(channel_id))
@@ -715,4 +752,188 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
         interaction = FakeInteraction(self.owner, stranger_channel, self.bot)
         panel = TempVoicePanel(self.bot)  # type: ignore[arg-type]
         self.assertFalse(await panel.interaction_check(interaction))
-        self.assertIn("salon temporaire", interaction.response.messages[-1]["embed"].description)
+        self.assertIn(
+            "vocaux temporaires", interaction.response.messages[-1]["embed"].description
+        )
+
+
+# --------------------------------------------------------------------------- #
+# Rattachement automatique (résilience après perte de la base)
+# --------------------------------------------------------------------------- #
+class PanelParsingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.guild = FakeGuild()
+        self.owner = self.guild.add_member(FakeMember(42, self.guild, "Léa"))
+
+    def test_is_panel_message(self) -> None:
+        from bot.services.tempvoice import is_panel_message
+
+        panel = FakeMessage(1, components=[FakeRow("vespara:tv:rename", "vespara:tv:lock")])
+        other = FakeMessage(2, components=[FakeRow("autre:button")])
+        self.assertTrue(is_panel_message(panel))
+        self.assertFalse(is_panel_message(other))
+        self.assertFalse(is_panel_message(FakeMessage(3)))
+
+    def test_parse_owner_from_marker_and_field(self) -> None:
+        from bot.services.tempvoice import parse_panel_owner
+
+        marked = discord.Embed(title="x")
+        marked.set_footer(text="Vespara • vespara:temproom:42 • Salon temporaire")
+        self.assertEqual(parse_panel_owner([marked]), 42)
+
+        field_based = discord.Embed(title="x")
+        field_based.add_field(name="👑 Propriétaire", value="<@!43>", inline=True)
+        self.assertEqual(parse_panel_owner([field_based]), 43)
+        self.assertIsNone(parse_panel_owner([]))
+
+    def test_owner_from_overwrites(self) -> None:
+        from bot.services.tempvoice import owner_from_overwrites
+
+        channel = FakeVoiceChannel(self.guild, "vocal", 1)
+        channel.overwrites = {
+            self.guild.default_role: discord.PermissionOverwrite(connect=True),
+            self.guild.me: discord.PermissionOverwrite(manage_channels=True),
+            self.owner: discord.PermissionOverwrite(manage_channels=True),
+            self.guild.add_member(FakeMember(50, self.guild, "Autre")): discord.PermissionOverwrite(
+                connect=False
+            ),
+        }
+        self.assertEqual(owner_from_overwrites(channel), self.owner.id)
+
+    def test_record_from_channel_reads_discord_state(self) -> None:
+        from bot.services.tempvoice import record_from_channel
+
+        channel = FakeVoiceChannel(self.guild, "Chill", 7, user_limit=4)
+        banned = self.guild.add_member(FakeMember(60, self.guild, "Banni"))
+        invited = self.guild.add_member(FakeMember(61, self.guild, "Invité"))
+        channel.overwrites = {
+            self.guild.default_role: discord.PermissionOverwrite(connect=False, view_channel=False),
+            self.owner: discord.PermissionOverwrite(manage_channels=True),
+            banned: discord.PermissionOverwrite(connect=False),
+            invited: discord.PermissionOverwrite(connect=True),
+        }
+
+        record = record_from_channel(channel, self.owner.id, panel_message_id=12)
+        self.assertEqual(record["channel_id"], 7)
+        self.assertEqual(record["guild_id"], self.guild.id)
+        self.assertEqual(record["owner_id"], self.owner.id)
+        self.assertEqual(record["panel_message_id"], 12)
+        self.assertEqual(record["limit"], 4)
+        self.assertTrue(record["locked"])
+        self.assertTrue(record["hidden"])
+        self.assertEqual(record["denied"], [60])
+        self.assertEqual(record["allowed"], [61])
+        self.assertTrue(record["recovered"])
+
+
+class RecoveryTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db = Database(Path(self.tmp.name) / "db.json")
+        self.guild = FakeGuild()
+        self.bot = FakeBot(self.db, self.guild)
+        self.bot.user = types.SimpleNamespace(id=999)
+        self.manager = TempVoiceManager(self.bot)  # type: ignore[arg-type]
+        self.manager.deletion_grace = 0
+        self.bot.tempvoice = self.manager  # type: ignore[attr-defined]
+
+        self.hub = FakeVoiceChannel(self.guild, "➕ Créer ton vocal", 900)
+        self.guild.channels[self.hub.id] = self.hub
+        settings = self.db.guild(self.guild.id)
+        settings["voice_hub_id"] = self.hub.id
+        settings["voice_hub_name"] = "➕ Créer ton vocal"
+
+        self.owner = self.guild.add_member(FakeMember(42, self.guild, "Léa"))
+        self.channel = await self.manager.create_room(self.owner, self.hub)
+        self.record = self.db.voice_room_of(self.guild.id, self.owner.id)
+        self.panel_message = self.channel._messages[self.record["panel_message_id"]]
+
+    async def asyncTearDown(self) -> None:
+        await self.manager.close()
+        await self.db.close()
+        self.tmp.cleanup()
+
+    def _lose_database(self) -> None:
+        """Simule un redémarrage avec disque éphémère : les fiches disparaissent."""
+        self.db.voice_rooms().clear()
+
+    async def test_panel_footer_carries_marker(self) -> None:
+        footer = self.panel_message.embeds[0].footer.text
+        self.assertIn(f"vespara:temproom:{self.owner.id}", footer)
+
+    async def test_recover_guild_reattaches_rooms(self) -> None:
+        self._lose_database()
+        self.assertIsNone(self.db.voice_room_of(self.guild.id, self.owner.id))
+
+        report = await self.manager.recover_guild(self.guild)
+
+        self.assertEqual(report["adopted"], 1)
+        record = self.db.voice_room_of(self.guild.id, self.owner.id)
+        self.assertIsNotNone(record)
+        self.assertEqual(record["channel_id"], self.channel.id)
+        self.assertEqual(record["panel_message_id"], self.panel_message.id)
+        # Le panneau est rafraîchi, pas dupliqué
+        self.assertEqual(len(self.channel.sent), 1)
+
+    async def test_recover_keeps_room_state(self) -> None:
+        await self.manager.set_locked(self.channel, self.record, True)
+        await self.manager.set_limit(self.channel, self.record, 3)
+        self._lose_database()
+
+        await self.manager.recover_guild(self.guild)
+        record = self.db.voice_room_of(self.guild.id, self.owner.id)
+        self.assertTrue(record["locked"])
+        self.assertEqual(record["limit"], 3)
+
+    async def test_recover_hub_by_name(self) -> None:
+        settings = self.db.guild(self.guild.id)
+        settings["voice_hub_id"] = None
+        recovered = await self.manager.recover_hub(self.guild)
+        self.assertIs(recovered, self.hub)
+        self.assertEqual(settings["voice_hub_id"], self.hub.id)
+
+    async def test_recover_ignores_foreign_channel(self) -> None:
+        foreign = FakeVoiceChannel(self.guild, "Salon staff", 950)
+        self.guild.channels[foreign.id] = foreign
+        self._lose_database()
+
+        report = await self.manager.recover_guild(self.guild)
+        self.assertEqual(report["adopted"], 1)  # uniquement le vrai vocal
+        self.assertFalse(self.manager.is_managed(foreign))
+
+    async def test_panel_button_reattaches_detached_room(self) -> None:
+        from bot.ui.tempvoice import TempVoicePanel
+
+        self._lose_database()
+        panel = TempVoicePanel(self.bot)  # type: ignore[arg-type]
+
+        interaction = FakeInteraction(self.owner, self.channel, self.bot)
+        interaction.message = self.panel_message
+        self.assertTrue(await panel.interaction_check(interaction))
+
+        await panel.lock.callback(interaction)  # type: ignore[union-attr]
+        record = self.db.voice_room_of(self.guild.id, self.owner.id)
+        self.assertIsNotNone(record)
+        self.assertTrue(record["locked"])
+        self.assertFalse(self.channel.overwrites[self.guild.default_role].connect)
+
+    async def test_detached_room_without_panel_uses_permissions(self) -> None:
+        self._lose_database()
+        self.channel._messages.clear()  # panneau supprimé
+        self.channel.overwrites = {
+            self.guild.default_role: discord.PermissionOverwrite(connect=True, view_channel=True),
+            self.guild.me: discord.PermissionOverwrite(manage_channels=True),
+            self.owner: discord.PermissionOverwrite(manage_channels=True, connect=True),
+        }
+
+        report = await self.manager.recover_guild(self.guild)
+        self.assertEqual(report["adopted"], 1)
+        record = self.db.voice_room_of(self.guild.id, self.owner.id)
+        self.assertIsNotNone(record)
+        # Un nouveau panneau est publié puisque l'ancien n'existe plus
+        self.assertEqual(len(self.channel.sent), 2)
+
+    async def test_candidate_channels_ignores_tracked_rooms(self) -> None:
+        self.assertEqual(self.manager.candidate_channels(self.guild), [])
+        self._lose_database()
+        self.assertEqual(len(self.manager.candidate_channels(self.guild)), 1)

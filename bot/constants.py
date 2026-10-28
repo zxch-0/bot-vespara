@@ -223,6 +223,8 @@ TEMPVOICE_DEFAULT_LIMIT: Final = 0
 TEMPVOICE_MAX_LIMIT: Final = 99
 # Nombre maximum de salons temporaires simultanés par serveur
 TEMPVOICE_MAX_ROOMS: Final = 50
+# Nombre maximum de salons inspectés au démarrage pour le rattachement auto
+TEMPVOICE_RECOVERY_MAX_CHANNELS: Final = 30
 # Délai (secondes) avant suppression d'un salon devenu vide : évite de
 # détruire un salon lors d'un simple déplacement entre deux vocaux.
 TEMPVOICE_DELETE_GRACE: Final = 3.0

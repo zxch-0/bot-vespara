@@ -17,7 +17,7 @@ Il est **prêt à déployer sur [Render](https://render.com) via un Blueprint**
 | 📢 **Annonces** | Rédaction dans un modal, **aperçu privé** avant publication, titre/contenu markdown, couleur, image, mention `@everyone` / `@here` / rôle staff | Staff |
 | 💬 **Auto-responder** | Déclencheurs `contient` / `commence par` / `finit par` / `exact` / `regex`, sensibilité à la casse, réponse texte ou embed, activation, cooldown, test en direct | Staff |
 | 🎱 **Boule magique** | `/boule` (alias `/8ball`) : tu poses une question, la boule se secoue et répond — oui, peut-être ou non — avec 30 réponses, un bouton **Secouer à nouveau** et un cooldown anti-spam | Tout le monde |
-| 🎧 **Vocaux temporaires** | Le staff installe un salon générateur accessible à tous ; le rejoindre crée instantanément un vocal personnel avec un **panneau de gestion dans le chat du salon** : renommer, verrouiller, masquer, limiter les places, expulser, autoriser, transférer, récupérer, supprimer. Salon supprimé automatiquement quand il est vide | Staff (installation) · tout le monde (utilisation) |
+| 🎧 **Vocaux temporaires** | Le staff installe un salon générateur accessible à tous ; le rejoindre crée instantanément un vocal personnel avec un **panneau de gestion dans le chat du salon** : renommer, verrouiller, masquer, limiter les places, expulser, autoriser, transférer, récupérer, supprimer. Salon supprimé automatiquement quand il est vide, et **rattachement automatique** des vocaux existants après un redémarrage | Staff (installation) · tout le monde (utilisation) |
 | 🎛️ **Menu** | Panneau à boutons : profil, infos serveur, rôles, giveaways, règlement, vocaux, infos bot | Tout le monde |
 | 🧰 **Utilitaires** | `/ping`, `/botinfo`, `/userinfo`, `/avatar`, `/banner`, `/serverinfo`, `/roleinfo`, `/rules`, `/giveaways` | Tout le monde |
 | 🩺 **Web** | `/health` pour Render, page de statut publique autonome (aucun CDN) et `/api/status` en JSON | Public |
@@ -157,8 +157,27 @@ dans son chat.
 | `/vocal etat` | Configuration + liste des vocaux ouverts |
 | `/vocal modele <modele>` | Nom des vocaux — variables `{user}`, `{username}`, `{count}` |
 | `/vocal limite <places>` | Places par défaut des nouveaux vocaux |
-| `/vocal nettoyer` | Répare les panneaux supprimés et les fiches orphelines |
+| `/vocal rattacher` | Rattache les vocaux détachés (perte de base, redéploiement) |
+| `/vocal nettoyer` | Rattache les vocaux détachés, répare les panneaux et les fiches orphelines |
 | `/vocal desactiver [supprimer_salons]` | Retire complètement le système |
+
+### 🔁 Résilience : les vocaux ne se détachent plus
+
+Le bot **ne dépend pas uniquement de sa base** pour reconnaître un vocal
+temporaire. Le panneau contient un marqueur (`vespara:temproom:<propriétaire>`)
+et le salon conserve les permissions du propriétaire : après un redémarrage, un
+redéploiement ou une perte du fichier de données (disque éphémère Render), le
+bot **rattache automatiquement** les vocaux existants :
+
+- au démarrage (`on_ready`), pour tous les serveurs ;
+- à la volée, dès qu'un bouton du panneau est cliqué sur un salon détaché ;
+- avec `/vocal rattacher` (rattachement immédiat, avec la liste des salons) ;
+- avec `/vocal nettoyer` (rattachement + réparation des panneaux).
+
+L'état complet est relu depuis Discord : propriétaire (panneau ou permissions),
+places, verrouillage, visibilité, membres expulsés ou autorisés. Le salon
+générateur lui-même est retrouvé **par son nom** si sa configuration a été
+perdue. Les vocaux encore rattachés n'ont donc plus besoin d'être recréés.
 
 > 🔑 **Permissions du bot nécessaires :** *Gérer les salons*, *Déplacer des
 > membres* et *Envoyer des messages*. Le panneau et les boutons étant
@@ -197,6 +216,9 @@ stockées dans un fichier JSON (`DATABASE_PATH`).
 
 > ⚠️ **Offre gratuite Render : le disque est éphémère.**
 > Les données sont perdues à chaque redéploiement ou redémarrage du service.
+> Les **vocaux temporaires** sont eux-mêmes récupérés depuis Discord (voir
+> [Résilience](#-résilience-les-vocaux-ne-se-détachent-plus)) : les salons
+> existants sont automatiquement rattachés au bot.
 
 Pour les conserver durablement :
 
@@ -231,12 +253,13 @@ ruff check .            # pip install ruff
 Astuce : ajoute ces deux commandes dans une GitHub Action pour lancer les
 tests automatiquement à chaque push.
 
-106 tests couvrent l'analyse des durées, les modes de l'auto-responder, la base
+118 tests couvrent l'analyse des durées, les modes de l'auto-responder, la base
 JSON, la page de statut, la structure des commandes (visibilité staff incluse),
 le cycle de vie complet d'un giveaway (création, participation, tirage, relance,
 suppression), la boule magique (tirage, embeds, bouton et cooldowns) et les
 vocaux temporaires (création au join, permissions, panneau de gestion, expulsion,
-transfert, récupération, suppression automatique), avec des objets Discord simulés.
+transfert, récupération, suppression automatique, **rattachement des salons après
+perte de la base**), avec des objets Discord simulés.
 
 ### Arborescence
 
@@ -300,7 +323,7 @@ bot/
 | `/config salon-annonces [salon]` | Salon par défaut des annonces |
 | `/config reglement [reinitialiser]` | Édite le règlement |
 | `/config menu [salon]` | Publie le panneau du menu |
-| `/vocal installer` · `etat` · `modele` · `limite` · `nettoyer` · `desactiver` | Vocaux temporaires (voir [Vocaux temporaires](#-vocaux-temporaires-crée-ton-vocal)) |
+| `/vocal installer` · `etat` · `modele` · `limite` · `rattacher` · `nettoyer` · `desactiver` | Vocaux temporaires (voir [Vocaux temporaires](#-vocaux-temporaires-crée-ton-vocal)) |
 | `/staffrole [rôle]` | Définit le rôle staff (admin) |
 
 ---
@@ -340,6 +363,7 @@ Les réponses se personnalisent dans `bot/constants.py` → `MAGIC8BALL_ANSWERS`
 | `PrivilegedIntentsRequired` au démarrage | Active les intents privilégiés (message content + members) |
 | `/vocal` n'apparaît pas | Commande staff : voir [Visibilité](#-visibilité-des-commandes-staff). L'installation demande **Gérer les salons** |
 | Les membres ne sont pas déplacés dans leur vocal | Donne au bot la permission **Déplacer des membres** |
+| Les vocaux « se détachent » (0 vocal actif alors que des salons existent) | Lance `/vocal rattacher` : le bot relit les panneaux et rattache les salons. C'est automatique au démarrage et au clic sur un bouton. Sur Render gratuit, la base est éphémère → voir [Persistance](#-persistance-des-données) |
 | Le panneau d'un vocal a été supprimé | Le propriétaire clique sur **Actualiser**, ou un staff lance `/vocal nettoyer` |
 | Le bot perd ses données | Offre gratuite Render : voir [Persistance](#-persistance-des-données) |
 | Le bot est en veille | Offre gratuite Render : `SELF_PING=true` aide à le garder éveillé, sans garantie (Render peut aussi redémarrer une instance gratuite à tout moment) |
