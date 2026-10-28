@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import discord
 
 from ..constants import EMOJI
-from ..helpers import reply_error
+from ..helpers import error, reply_error
 from .builders import (
     bot_info_embed,
     giveaways_embed,
@@ -18,6 +18,7 @@ from .builders import (
     server_embed,
     voice_info_embed,
 )
+from .economy import profile_embed as economy_profile_embed
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..main import VesparaBot
@@ -33,21 +34,23 @@ class MenuView(discord.ui.View):
         self.bot = bot
 
         definitions = (
-            ("profile", "Mon profil", "👤", self.show_profile),
-            ("server", "Le serveur", "🏰", self.show_server),
-            ("roles", "Rôles", "🎭", self.show_roles),
-            ("giveaways", "Giveaways", EMOJI["gift"], self.show_giveaways),
-            ("rules", "Règlement", EMOJI["book"], self.show_rules),
-            ("voice", "Vocaux", EMOJI["mic"], self.show_voice),
-            ("bot", "Le bot", EMOJI["bot"], self.show_bot),
+            ("profile", "Mon profil", "👤", discord.ButtonStyle.success, self.show_profile),
+            ("economy", "Économie", "🪙", discord.ButtonStyle.primary, self.show_economy),
+            ("giveaways", "Giveaways", EMOJI["gift"], discord.ButtonStyle.secondary, self.show_giveaways),
+            ("voice", "Vocaux", EMOJI["mic"], discord.ButtonStyle.secondary, self.show_voice),
+            ("casino", "Casino", "🎲", discord.ButtonStyle.secondary, self.show_casino),
+            ("server", "Le serveur", "🏰", discord.ButtonStyle.secondary, self.show_server),
+            ("roles", "Rôles", "🎭", discord.ButtonStyle.secondary, self.show_roles),
+            ("rules", "Règlement", EMOJI["book"], discord.ButtonStyle.secondary, self.show_rules),
+            ("bot", "Le bot", EMOJI["bot"], discord.ButtonStyle.secondary, self.show_bot),
         )
-        for index, (key, label, emoji, callback) in enumerate(definitions):
+        for index, (key, label, emoji, style, callback) in enumerate(definitions):
             button = discord.ui.Button(
                 label=label,
                 emoji=emoji,
-                style=discord.ButtonStyle.primary if key == "profile" else discord.ButtonStyle.secondary,
+                style=style,
                 custom_id=f"{CUSTOM_ID_PREFIX}:{key}",
-                row=0 if index < 5 else 1,
+                row=index // 5,
             )
             button.callback = callback  # type: ignore[method-assign]
             self.add_item(button)
@@ -87,6 +90,34 @@ class MenuView(discord.ui.View):
         if guild is None:
             return
         await interaction.response.send_message(embed=rules_embed(self.bot, guild), ephemeral=True)
+
+    async def show_economy(self, interaction: discord.Interaction) -> None:
+        guild = await self._guild(interaction)
+        if guild is None:
+            return
+        manager = getattr(self.bot, "economy", None)
+        if manager is None:  # pragma: no cover - module toujours chargé
+            await interaction.response.send_message(
+                embed=error("Le module d'économie n'est pas disponible."), ephemeral=True
+            )
+            return
+        await interaction.response.send_message(
+            embed=economy_profile_embed(manager, guild, interaction.user), ephemeral=True
+        )
+
+    async def show_casino(self, interaction: discord.Interaction) -> None:
+        guild = await self._guild(interaction)
+        if guild is None:
+            return
+        manager = getattr(self.bot, "economy", None)
+        balance = manager.balance(guild.id, interaction.user.id) if manager else 0
+        from .casino import CasinoView, casino_home_embed
+
+        await interaction.response.send_message(
+            embed=casino_home_embed(self.bot, guild, balance),
+            view=CasinoView(self.bot, guild, interaction.user.id),
+            ephemeral=True,
+        )
 
     async def show_voice(self, interaction: discord.Interaction) -> None:
         guild = await self._guild(interaction)

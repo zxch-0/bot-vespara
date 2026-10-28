@@ -22,6 +22,10 @@ COLOR_INFO: Final = 0x5865F2
 COLOR_MUTED: Final = 0x6B7280
 COLOR_GIVEAWAY: Final = 0xA78BFA
 COLOR_ANNOUNCE: Final = 0x7C3AED
+COLOR_ECONOMY: Final = 0xFBBF24  # or / coins
+COLOR_CASINO: Final = 0x10B981  # vert tapis de jeu
+COLOR_LEVEL: Final = 0x22D3EE  # cyan des niveaux
+COLOR_LEGENDARY: Final = 0xF97316  # orange des gros gains
 
 # Palette utilisée par défaut pour les annonces
 ANNOUNCE_COLORS: Final[dict[str, int]] = {
@@ -127,6 +131,7 @@ STAFF_COMMAND_ROOTS: Final[dict[str, str]] = {
     "autoresponder": "Réponses automatiques",
     "config": "Configuration du serveur",
     "vocal": "Salons vocaux temporaires",
+    "eco-admin": "Administration de l'économie",
 }
 
 # --------------------------------------------------------------------------- #
@@ -227,7 +232,7 @@ TEMPVOICE_MAX_ROOMS: Final = 50
 TEMPVOICE_RECOVERY_MAX_CHANNELS: Final = 30
 # Délai (secondes) avant suppression d'un salon devenu vide : évite de
 # détruire un salon lors d'un simple déplacement entre deux vocaux.
-TEMPVOICE_DELETE_GRACE: Final = 3.0
+TEMPVOICE_DELETE_GRACE: Final = 5.0
 # Texte d'information publié dans le chat du salon générateur.
 TEMPVOICE_HUB_MESSAGE: Final = (
     "**Rejoins ce salon vocal pour obtenir ton propre vocal !**\n\n"
@@ -237,3 +242,101 @@ TEMPVOICE_HUB_MESSAGE: Final = (
     "transférer la propriété, supprimer…\n"
     "• Le salon est **supprimé tout seul** dès qu'il est vide."
 )
+
+# --------------------------------------------------------------------------- #
+# Thème graphique (esthétique « néon » partagée par tous les embeds)
+# --------------------------------------------------------------------------- #
+THEME_GRADIENTS: Final[dict[str, list[int]]] = {
+    "violet": [0x8B5CF6, 0x6366F1, 0x4F46E5],
+    "nuit": [0x0F172A, 0x312E81, 0x6D28D9],
+    "menthe": [0x34D399, 0x059669, 0x0D9488],
+    "or": [0xFDE68A, 0xF59E0B, 0xD97706],
+    "feu": [0xF97316, 0xEF4444, 0xBE123C],
+    "ocean": [0x22D3EE, 0x0EA5E9, 0x2563EB],
+    "rose": [0xF472B6, 0xDB2777, 0x9D174D],
+    "givaway": [0xA78BFA, 0x8B5CF6, 0x6D28D9],
+}
+
+# Barres de progression / animations textuelles
+SPARKLES: Final = ("✨", "💫", "⭐", "🌟", "✦")
+CONFETTI: Final = ("🎉", "🎊", "✨", "🎈", "🪅")
+PROGRESS_FULL: Final = "▰"
+PROGRESS_EMPTY: Final = "▱"
+PROGRESS_HEAD: Final = "◆"
+
+# Petites animations d'attente (frame -> texte)
+LOADING_FRAMES: Final[tuple[str, ...]] = ("◐", "◓", "◑", "◒")
+SLOT_SYMBOLS: Final[tuple[str, ...]] = ("🍒", "🍋", "🔔", "💎", "⭐", "7️⃣")
+
+# --------------------------------------------------------------------------- #
+# Économie, niveaux et casino
+# --------------------------------------------------------------------------- #
+CURRENCY_NAME: Final = "coins"
+CURRENCY_EMOJI: Final = "🪙"
+ECONOMY_START_BALANCE: Final = 100
+ECONOMY_MAX_BET: Final = 50_000
+ECONOMY_MIN_BET: Final = 10
+ECONOMY_MAX_TRANSFER: Final = 100_000
+ECONOMY_DAILY_BASE: Final = 150
+ECONOMY_DAILY_STREAK_BONUS: Final = 50
+ECONOMY_DAILY_STREAK_MAX: Final = 7
+ECONOMY_WORK_MIN: Final = 40
+ECONOMY_WORK_MAX: Final = 160
+ECONOMY_WORK_COOLDOWN: Final = 3600  # 1 h
+ECONOMY_DAILY_COOLDOWN: Final = 79200  # 22 h (marge pour ne pas rater un jour)
+# XP gagné par message
+ECONOMY_XP_MIN: Final = 12
+ECONOMY_XP_MAX: Final = 26
+ECONOMY_XP_COOLDOWN: Final = 45  # secondes entre deux gains d'XP
+ECONOMY_XP_BASE: Final = 120  # XP requis pour le niveau 1 -> 2
+ECONOMY_XP_EXPONENT: Final = 1.45
+ECONOMY_MAX_LEVEL: Final = 500
+ECONOMY_COINS_PER_LEVEL: Final = 25  # bonus de coins par niveau gagné
+MAX_SHOP_ITEMS: Final = 40
+MAX_LEVEL_REWARDS: Final = 30
+
+# Gains du casino (multiplicateurs bruts, l'avantage maison reste léger)
+CASINO_BLACKJACK_PAYOUT: Final = 2.0  # gain net = mise (paiement 1:1)
+CASINO_BLACKJACK_NATURAL: Final = 2.5  # blackjack naturel
+CASINO_SLOTS_PAYOUTS: Final[dict[int, float]] = {3: 12.0, 2: 2.2}
+CASINO_ROULETTE_PAYOUTS: Final[dict[str, float]] = {
+    "rouge": 2.0,
+    "noir": 2.0,
+    "pair": 2.0,
+    "impair": 2.0,
+    "bas": 2.0,
+    "haut": 2.0,
+    "vert": 14.0,
+    "nombre": 36.0,
+}
+CASINO_DICE_PAYOUTS: Final[dict[str, float]] = {
+    "pair": 2.0,
+    "impair": 2.0,
+    "sept": 6.0,
+    "double": 8.0,
+    "haut": 2.0,
+    "bas": 2.0,
+}
+
+# Libellés français des paris
+ROULETTE_LABELS: Final[dict[str, str]] = {
+    "rouge": "🔴 Rouge",
+    "noir": "⚫ Noir",
+    "pair": "⚖️ Pair",
+    "impair": "🎯 Impair",
+    "bas": "📉 1-18",
+    "haut": "📈 19-36",
+    "vert": "🟢 Vert (0)",
+    "nombre": "🔢 Un numéro",
+}
+DICE_LABELS: Final[dict[str, str]] = {
+    "pair": "⚖️ Somme paire",
+    "impair": "🎯 Somme impaire",
+    "sept": "7️⃣ Exactement 7",
+    "double": "👯 Double",
+    "haut": "📈 9-12",
+    "bas": "📉 2-6",
+}
+
+# Récompenses de série de /daily (index = jours consécutifs)
+DAILY_STREAK_MULTIPLIERS: Final[tuple[float, ...]] = (1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.5)

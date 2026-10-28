@@ -19,11 +19,14 @@ from ..constants import (
     FOOTER,
 )
 from ..helpers import (
+    accent_color,
+    animated_progress,
     embed,
     full_timestamp,
     humanize_duration,
     timestamp,
     truncate,
+    utcnow,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -189,6 +192,7 @@ def rules_embed(bot: "VesparaBot", guild: discord.Guild) -> discord.Embed:
 
 
 def giveaways_embed(bot: "VesparaBot", guild: discord.Guild) -> discord.Embed:
+    now = utcnow().timestamp()
     active = bot.db.guild_giveaways(guild.id)
     if not active:
         return embed(
@@ -201,16 +205,22 @@ def giveaways_embed(bot: "VesparaBot", guild: discord.Guild) -> discord.Embed:
     for gw in active[:10]:
         jump = f"https://discord.com/channels/{guild.id}/{gw.get('channel_id')}/{gw.get('message_id')}"
         entries = len(gw.get("entries", []))
+        start = float(gw.get("started_at") or now)
+        end = float(gw.get("ends_at") or now)
+        ratio = (now - start) / (end - start) if end > start else 1.0
         lines.append(
             f"{EMOJI['party']} **[{truncate(gw['prize'], 60)}]({jump})**\n"
-            f"　　 {entries} participant{'s' if entries > 1 else ''} · "
-            f"se termine {timestamp(gw.get('ends_at'))}"
+            f"　　{animated_progress(1 - ratio, 10)} {entries} participant"
+            f"{'s' if entries > 1 else ''}\n"
+            f"　　{EMOJI['clock']} se termine {timestamp(gw.get('ends_at'))}"
         )
 
     return embed(
         title=f"{EMOJI['gift']} Giveaways en cours",
         description="\n\n".join(lines),
         color=COLOR_GIVEAWAY,
+        accent="givaway",
+        icon=EMOJI["sparkles"],
     )
 
 
@@ -264,25 +274,56 @@ def bot_info_embed(bot: "VesparaBot") -> discord.Embed:
     except Exception:  # pragma: no cover
         memory = 0.0
 
+    latency = getattr(bot, "latency_ms", 0)
+    health = (
+        f"{EMOJI['success']} excellente"
+        if 0 < latency < 120
+        else (f"{EMOJI['warning']} correcte" if latency < 300 else f"{EMOJI['error']} dégradée")
+        if latency
+        else f"{EMOJI['clock']} connexion en cours"
+    )
     emb = embed(
         title=f"{EMOJI['bot']} {bot.settings.brand}",
-        description=f"*{bot.settings.tagline}* — bot de gestion et d'animation du serveur.",
+        description=(
+            f"### *{bot.settings.tagline}*\n"
+            f"Giveaways, annonces, réponses automatiques, vocaux temporaires, "
+            f"économie et casino — tout en un.\n\u200b"
+        ),
         color=COLOR,
+        accent="violet",
         thumbnail=bot.user.display_avatar.url if bot.user else None,
+        icon=EMOJI["bot"],
     )
     emb.add_field(name="Version", value=f"`{__version__}`", inline=True)
-    emb.add_field(name="Latence", value=f"`{round(bot.latency * 1000)} ms`", inline=True)
+    emb.add_field(name="Latence", value=f"`{latency} ms` · {health}", inline=True)
     emb.add_field(name="En ligne depuis", value=humanize_duration(uptime), inline=True)
-    emb.add_field(name="Serveurs", value=str(len(bot.guilds)), inline=True)
+    emb.add_field(name="Serveurs", value=f"**{len(bot.guilds)}**", inline=True)
     emb.add_field(
         name="Commandes",
-        value=str(getattr(bot, "command_count", None) or len(bot.tree.get_commands())),
+        value=f"**{getattr(bot, 'command_count', None) or len(bot.tree.get_commands())}**",
         inline=True,
     )
-    emb.add_field(name="Giveaways actifs", value=str(stats["active_giveaways"]), inline=True)
-    emb.add_field(name="Réponses auto", value=str(stats["autoresponses"]), inline=True)
     emb.add_field(name="Mémoire", value=f"{memory:.0f} Mo", inline=True)
-    emb.add_field(name="Stack", value=f"Python {platform.python_version()}\ndiscord.py {discord.__version__}", inline=True)
+    emb.add_field(
+        name=f"{EMOJI['gift']} Giveaways",
+        value=f"{stats['active_giveaways']} en cours",
+        inline=True,
+    )
+    emb.add_field(
+        name=f"{EMOJI['mic']} Vocaux",
+        value=f"{stats.get('voice_rooms', 0)} ouvert(s)",
+        inline=True,
+    )
+    emb.add_field(
+        name=f"{EMOJI['users']} Comptes éco",
+        value=f"{stats.get('accounts', 0)}",
+        inline=True,
+    )
+    emb.add_field(
+        name="Stack",
+        value=f"Python {platform.python_version()} · discord.py {discord.__version__}",
+        inline=False,
+    )
     emb.set_footer(text=f"{FOOTER} • {guild_footer(bot)}")
     return emb
 
@@ -293,43 +334,57 @@ def guild_footer(bot: "VesparaBot") -> str:
 
 
 def menu_embed(bot: "VesparaBot", guild: discord.Guild) -> discord.Embed:
+    """Panneau d'accueil : carte de visite animée du serveur."""
     settings = bot.settings
+    stats = bot.db.stats()
     emb = embed(
         title=f"{EMOJI['leaf']} {settings.brand}",
         description=(
-            f"Bienvenue sur **{settings.brand}**, {settings.tagline} 🍃\n"
-            "Utilise les boutons ci-dessous pour découvrir le serveur en un clic.\n"
+            f"### Bienvenue sur **{settings.brand}**\n"
+            f"*{settings.tagline}* 🍃\n\n"
+            "Clique sur un bouton ci-dessous pour explorer le serveur en un clin d'œil."
         ),
-        color=COLOR,
+        color=accent_color("violet"),
         thumbnail=guild.icon.url if guild.icon else None,
+        accent="violet",
+        icon=EMOJI["sparkles"],
     )
     emb.add_field(
-        name=f"{EMOJI['tools']} Commandes utiles",
+        name=f"{EMOJI['tools']} Découverte",
         value=(
-            "`/menu` · afficher ce menu\n"
-            "`/rules` · consulter le règlement\n"
+            "`/menu` · ce panneau\n"
+            "`/rules` · le règlement\n"
             "`/userinfo` · fiche d'un membre\n"
             "`/serverinfo` · infos du serveur\n"
-            "`/roleinfo` · détails d'un rôle\n"
-            "`/avatar` et `/banner` · images de profil\n"
-            "`/giveaways` · giveaways en cours\n"
-            "`/boule` · question à la boule magique\n"
-            "`/menu` → bouton **Vocaux** · créer ton vocal\n"
-            "`/ping` et `/botinfo` · état du bot"
+            "`/roleinfo` · détails d'un rôle"
         ),
         inline=True,
     )
     emb.add_field(
         name=f"{EMOJI['gift']} Animation",
         value=(
-            "Des giveaways sont organisés régulièrement par l'équipe.\n"
-            "Clique sur 🎉 sous un giveaway pour tenter ta chance !"
+            "`/giveaways` · giveaways en cours\n"
+            "`/boule` · boule magique 🎱\n"
+            "`/casino accueil` · jeux de coins\n"
+            "`/eco daily` · récompense du jour"
         ),
         inline=True,
     )
     emb.add_field(
-        name="\u200b",
-        value=f"{EMOJI['info']} En cas de souci, contacte un membre du staff.",
+        name=f"{EMOJI['mic']} Ton espace",
+        value=(
+            "Rejoins le salon **vocaux** pour obtenir ton vocal personnel,\n"
+            "puis gère-le directement depuis le panneau du salon créé."
+        ),
+        inline=False,
+    )
+    emb.add_field(
+        name=f"{EMOJI['chart']} Le serveur en chiffres",
+        value=(
+            f"{EMOJI['users']} **{guild.member_count or '?'}** membres · "
+            f"{EMOJI['gift']} **{stats['active_giveaways']}** giveaway(s) · "
+            f"{EMOJI['mic']} **{stats.get('voice_rooms', 0)}** vocal(aux)"
+        ),
         inline=False,
     )
     emb.set_footer(

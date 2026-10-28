@@ -13,10 +13,16 @@ from .constants import (
     COLOR,
     COLOR_ERROR,
     COLOR_INFO,
+    COLOR_MUTED,
     COLOR_SUCCESS,
     COLOR_WARNING,
     EMOJI,
     FOOTER,
+    LOADING_FRAMES,
+    PROGRESS_EMPTY,
+    PROGRESS_FULL,
+    PROGRESS_HEAD,
+    THEME_GRADIENTS,
 )
 
 log = logging.getLogger(__name__)
@@ -124,6 +130,49 @@ def progress_bar(ratio: float, length: int = 14) -> str:
     return "▰" * filled + "▱" * (length - filled)
 
 
+def animated_progress(ratio: float, length: int = 14) -> str:
+    """Barre de progression avec une tête lumineuse : plus jolie à lire."""
+    ratio = min(1.0, max(0.0, float(ratio)))
+    length = max(4, int(length))
+    filled = round(ratio * (length - 1))
+    if ratio >= 1.0:
+        return PROGRESS_FULL * length
+    ease = "▰" * filled
+    head = PROGRESS_HEAD if filled < length - 1 else PROGRESS_FULL
+    rest = PROGRESS_EMPTY * (length - 1 - filled)
+    return ease + head + rest
+
+
+def percent_bar(ratio: float, length: int = 12) -> str:
+    """« ▰▰▰▱▱ 42 % » — prêt à coller dans un embed."""
+    return f"{animated_progress(ratio, length)} `{round(max(0.0, min(1.0, ratio)) * 100):>3.0f} %`"
+
+
+def spinner(step: int) -> str:
+    """Petite animation d'attente (appelée à chaque frame)."""
+    return LOADING_FRAMES[step % len(LOADING_FRAMES)]
+
+
+def typing_dots(step: int, maximum: int = 3) -> str:
+    """Suffixe animé « . », « .. », « ... »."""
+    return "." * ((step % maximum) + 1)
+
+
+def gradient_color(accent: str | None = None, position: float = 0.0) -> int:
+    """Couleur d'un dégradé de thème (0.0 → début, 1.0 → fin)."""
+    colors = THEME_GRADIENTS.get((accent or "").lower()) or [COLOR]
+    if len(colors) == 1:
+        return colors[0]
+    position = min(1.0, max(0.0, float(position)))
+    index = round(position * (len(colors) - 1))
+    return colors[index]
+
+
+def accent_color(accent: str | None) -> int:
+    """Couleur principale d'un thème (ou couleur par défaut)."""
+    return gradient_color(accent, 0.0)
+
+
 # --------------------------------------------------------------------------- #
 # Dates
 # --------------------------------------------------------------------------- #
@@ -174,11 +223,25 @@ def embed(
     thumbnail: str | None = None,
     image: str | None = None,
     timestamp_now: bool = True,
+    accent: str | None = None,
+    icon: str | None = None,
+    icon_url: str | None = None,
 ) -> discord.Embed:
-    """Crée un embed aux couleurs de Vespara."""
+    """Crée un embed aux couleurs de Vespara.
+
+    `accent` choisit un dégradé de thème (`violet`, `menthe`, `or`, `feu`,
+    `ocean`, `rose`, `nuit`…) et remplace la couleur par défaut. `icon` ajoute
+    un petit emoji devant le pied de page.
+    """
+    if accent:
+        color = accent_color(accent)
     emb = discord.Embed(title=title, description=description, color=color)
     if footer:
-        emb.set_footer(text=footer)
+        text = f"{icon} {footer}" if icon else footer
+        if icon_url:
+            emb.set_footer(text=text, icon_url=icon_url)
+        else:
+            emb.set_footer(text=text)
     if thumbnail:
         emb.set_thumbnail(url=thumbnail)
     if image:
@@ -190,11 +253,25 @@ def embed(
 
 def success(message: str, *, title: str | None = None) -> discord.Embed:
     heading = title or "C'est fait !"
-    return embed(title=f"{EMOJI['success']} {heading}", description=message, color=COLOR_SUCCESS)
+    return embed(
+        title=f"{EMOJI['success']} {heading}",
+        description=message,
+        color=COLOR_SUCCESS,
+        icon=EMOJI["sparkles"],
+    )
 
 
 def error(message: str, *, title: str | None = None) -> discord.Embed:
-    return embed(title=f"{EMOJI['error']} {title or 'Oups'} ", description=message, color=COLOR_ERROR)
+    return embed(
+        title=f"{EMOJI['error']} {title or 'Oups'} ",
+        description=message,
+        color=COLOR_ERROR,
+    )
+
+
+def muted(message: str, *, title: str | None = None) -> discord.Embed:
+    """Embed discret (états neutres, historique vide…)."""
+    return embed(title=title, description=message, color=COLOR_MUTED)
 
 
 def warning(message: str, *, title: str | None = None) -> discord.Embed:

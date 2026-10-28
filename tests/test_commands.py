@@ -51,14 +51,14 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(expected.issubset(names), expected - names)
 
     def test_staff_commands_are_hidden(self) -> None:
-        for root in ("giveaway", "annonce", "autoresponder", "config", "vocal"):
+        for root in ("giveaway", "annonce", "autoresponder", "config", "vocal", "eco-admin"):
             command = self.bot.tree.get_command(root)
             self.assertIsNotNone(command, root)
             self.assertIsNotNone(command.default_permissions, root)  # type: ignore[union-attr]
             self.assertEqual(command.default_permissions.value, discord.Permissions(manage_guild=True).value)  # type: ignore[union-attr]
 
     def test_staff_subcommands_have_role_check(self) -> None:
-        for root in ("giveaway", "autoresponder", "config", "vocal"):
+        for root in ("giveaway", "autoresponder", "config", "vocal", "eco-admin"):
             group = self.bot.tree.get_command(root)
             self.assertIsInstance(group, app_commands.Group)
             for subcommand in group.commands:  # type: ignore[union-attr]
@@ -104,9 +104,32 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
             {"installer", "etat", "modele", "limite", "rattacher", "nettoyer", "desactiver"},
         )
 
+    def test_economy_managers_registered(self) -> None:
+        self.assertIsNotNone(self.bot.economy)
+        self.assertIsNotNone(getattr(self.bot, "economy", None))
+
+    def test_public_groups_are_open(self) -> None:
+        for name in ("eco", "boutique", "casino"):
+            command = self.bot.tree.get_command(name)
+            self.assertIsInstance(command, app_commands.Group, name)
+            self.assertIsNone(command.default_permissions, name)  # type: ignore[union-attr]
+            for subcommand in command.commands:  # type: ignore[union-attr]
+                with self.subTest(command=f"/{name} {subcommand.name}"):
+                    self.assertEqual(len(subcommand.checks), 0)
+
+    def test_eco_admin_is_staff_only(self) -> None:
+        group = self.bot.tree.get_command("eco-admin")
+        self.assertIsInstance(group, app_commands.Group)
+        self.assertIsNotNone(group.default_permissions)  # type: ignore[union-attr]
+        names = {subcommand.name for subcommand in group.commands}  # type: ignore[union-attr]
+        self.assertTrue({"donner", "retirer", "article-ajouter", "recompense"} <= names)
+        for subcommand in group.commands:  # type: ignore[union-attr]
+            with self.subTest(command=subcommand.name):
+                self.assertTrue(subcommand.checks)
+
     def test_command_count_includes_subcommands(self) -> None:
-        # 18 commandes racine + 5 giveaways + 7 autoresponder + 4 config + 7 vocal
-        self.assertEqual(self.bot.command_count, 41)
+        # 22 commandes racine + sous-commandes (giveaway, vocal, eco, boutique, casino…)
+        self.assertEqual(self.bot.command_count, 73)
 
     def test_magic_ball_commands(self) -> None:
         for name in ("boule", "8ball"):
