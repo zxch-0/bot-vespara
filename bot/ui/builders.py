@@ -13,6 +13,7 @@ from ..constants import (
     COLOR,
     COLOR_GIVEAWAY,
     COLOR_INFO,
+    COLOR_MUTED,
     DEFAULT_RULES,
     EMOJI,
     FOOTER,
@@ -213,6 +214,45 @@ def giveaways_embed(bot: "VesparaBot", guild: discord.Guild) -> discord.Embed:
     )
 
 
+def voice_info_embed(bot: "VesparaBot", guild: discord.Guild) -> discord.Embed:
+    """Explique comment obtenir un vocal personnel (bouton du menu)."""
+    settings = bot.db.guild(guild.id)
+    hub_id = settings.get("voice_hub_id")
+    hub = guild.get_channel(int(hub_id)) if hub_id else None
+    rooms = bot.db.guild_voice_rooms(guild.id)
+
+    if hub is None:
+        return embed(
+            title=f"{EMOJI['mic']} Vocaux temporaires",
+            description=(
+                "Les vocaux personnels ne sont pas encore activés sur ce serveur.\n"
+                "Un membre du staff peut les installer avec `/vocal installer`."
+            ),
+            color=COLOR_MUTED,
+        )
+
+    emb = embed(
+        title=f"{EMOJI['mic']} Ton vocal, en un clic",
+        description=(
+            f"Rejoins le salon **{hub.name}** ({hub.mention}) et je te crée "
+            "instantanément un vocal personnel.\n\n"
+            "**Dans le salon créé**, un panneau apparaît dans le chat pour :\n"
+            "• renommer le vocal ;\n"
+            "• limiter le nombre de places ;\n"
+            "• le verrouiller ou le rendre privé ;\n"
+            "• expulser ou autoriser des membres ;\n"
+            "• transférer la propriété ou supprimer le salon.\n\n"
+            "Le salon est supprimé automatiquement dès qu'il est vide. 🍃"
+        ),
+        color=COLOR,
+        thumbnail=guild.icon.url if guild.icon else None,
+    )
+    emb.add_field(name="Salon générateur", value=hub.mention, inline=True)
+    emb.add_field(name="Vocaux ouverts", value=str(len(rooms)), inline=True)
+    emb.set_footer(text=FOOTER)
+    return emb
+
+
 # --------------------------------------------------------------------------- #
 # Bot / menu
 # --------------------------------------------------------------------------- #
@@ -274,6 +314,7 @@ def menu_embed(bot: "VesparaBot", guild: discord.Guild) -> discord.Embed:
             "`/avatar` et `/banner` · images de profil\n"
             "`/giveaways` · giveaways en cours\n"
             "`/boule` · question à la boule magique\n"
+            "`/menu` → bouton **Vocaux** · créer ton vocal\n"
             "`/ping` et `/botinfo` · état du bot"
         ),
         inline=True,

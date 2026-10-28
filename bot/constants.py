@@ -63,6 +63,17 @@ EMOJI: Final[dict[str, str]] = {
     "menu": "🎛️",
     "tools": "🧰",
     "reply": "💬",
+    "mic": "🎧",
+    "lock": "🔒",
+    "unlock": "🔓",
+    "trash": "🗑️",
+    "pencil": "✏️",
+    "eye": "👁️",
+    "eye_off": "🙈",
+    "handshake": "🤝",
+    "refresh": "🔄",
+    "no_entry": "🚫",
+    "speaker": "🔊",
 }
 
 # --------------------------------------------------------------------------- #
@@ -115,6 +126,7 @@ STAFF_COMMAND_ROOTS: Final[dict[str, str]] = {
     "annonce": "Publication d'annonces",
     "autoresponder": "Réponses automatiques",
     "config": "Configuration du serveur",
+    "vocal": "Salons vocaux temporaires",
 }
 
 # --------------------------------------------------------------------------- #
@@ -197,3 +209,29 @@ MAGIC8BALL_COOLDOWN: Final = 4.0  # secondes entre deux questions
 MAX_AUTORESPONSES: Final = 50
 MAX_GIVEAWAY_DURATION: Final = 60 * 60 * 24 * 90  # 90 jours
 MIN_GIVEAWAY_DURATION: Final = 10  # secondes
+
+# --------------------------------------------------------------------------- #
+# Salons vocaux temporaires (« crée ton vocal »)
+# --------------------------------------------------------------------------- #
+# Nom du salon générateur créé par /vocal installer.
+TEMPVOICE_HUB_NAME: Final = "➕ Créer ton vocal"
+# Modèle de nom des salons créés. Variables : {user}, {username}, {count}
+TEMPVOICE_NAME_TEMPLATE: Final = "Vocal de {user}"
+TEMPVOICE_NAME_MAX_LENGTH: Final = 100
+# Limite de places par défaut (0 = illimitée)
+TEMPVOICE_DEFAULT_LIMIT: Final = 0
+TEMPVOICE_MAX_LIMIT: Final = 99
+# Nombre maximum de salons temporaires simultanés par serveur
+TEMPVOICE_MAX_ROOMS: Final = 50
+# Délai (secondes) avant suppression d'un salon devenu vide : évite de
+# détruire un salon lors d'un simple déplacement entre deux vocaux.
+TEMPVOICE_DELETE_GRACE: Final = 3.0
+# Texte d'information publié dans le chat du salon générateur.
+TEMPVOICE_HUB_MESSAGE: Final = (
+    "**Rejoins ce salon vocal pour obtenir ton propre vocal !**\n\n"
+    "• Ton salon est créé automatiquement et tu en deviens le **propriétaire**.\n"
+    "• Un **panneau de gestion** apparaît dans le chat texte du salon : "
+    "renommer, verrouiller, limiter les places, expulser des membres, "
+    "transférer la propriété, supprimer…\n"
+    "• Le salon est **supprimé tout seul** dès qu'il est vide."
+)

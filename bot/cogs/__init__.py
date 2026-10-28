@@ -8,6 +8,7 @@ EXTENSIONS = (
     "bot.cogs.utilities",
     "bot.cogs.fun",
     "bot.cogs.settings",
+    "bot.cogs.tempvoice",
 )
 
 __all__ = ["EXTENSIONS"]

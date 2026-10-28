@@ -53,6 +53,7 @@ class VesparaBot(commands.Bot):
         self.started_at = utcnow()
         self.web = StatusServer(self)
         self.giveaway_manager: Any = None  # injecté par le cog giveaways
+        self.tempvoice: Any = None  # injecté par le cog tempvoice
         self._startup_logged = False
 
     # ------------------------------------------------------------------ #
@@ -195,12 +196,14 @@ class VesparaBot(commands.Bot):
         emb = embed(
             title=f"{EMOJI['wave']} Merci de m'avoir ajouté sur {guild.name} !",
             description=(
-                "Je gère les **giveaways**, les **annonces** et les **réponses automatiques**, "
-                "et je propose un **menu** avec plein de petites commandes utiles.\n\n"
+                "Je gère les **giveaways**, les **annonces**, les **réponses automatiques** et "
+                "les **vocaux temporaires**, et je propose un **menu** avec plein de petites "
+                "commandes utiles.\n\n"
                 "**Pour commencer**\n"
                 "• `/menu` — afficher le menu du serveur\n"
                 "• `/staffrole` — définir le rôle staff (administrateur)\n"
-                "• `/config voir` — vérifier la configuration\n\n"
+                "• `/config voir` — vérifier la configuration\n"
+                "• `/vocal installer` — activer les vocaux personnels\n\n"
                 "*Les commandes de gestion sont réservées au rôle staff.*"
             ),
             color=COLOR,

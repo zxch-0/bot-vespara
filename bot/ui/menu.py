@@ -16,6 +16,7 @@ from .builders import (
     roles_embed,
     rules_embed,
     server_embed,
+    voice_info_embed,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -37,6 +38,7 @@ class MenuView(discord.ui.View):
             ("roles", "Rôles", "🎭", self.show_roles),
             ("giveaways", "Giveaways", EMOJI["gift"], self.show_giveaways),
             ("rules", "Règlement", EMOJI["book"], self.show_rules),
+            ("voice", "Vocaux", EMOJI["mic"], self.show_voice),
             ("bot", "Le bot", EMOJI["bot"], self.show_bot),
         )
         for index, (key, label, emoji, callback) in enumerate(definitions):
@@ -85,6 +87,12 @@ class MenuView(discord.ui.View):
         if guild is None:
             return
         await interaction.response.send_message(embed=rules_embed(self.bot, guild), ephemeral=True)
+
+    async def show_voice(self, interaction: discord.Interaction) -> None:
+        guild = await self._guild(interaction)
+        if guild is None:
+            return
+        await interaction.response.send_message(embed=voice_info_embed(self.bot, guild), ephemeral=True)
 
     async def show_bot(self, interaction: discord.Interaction) -> None:
         await interaction.response.send_message(embed=bot_info_embed(self.bot), ephemeral=True)

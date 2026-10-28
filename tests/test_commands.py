@@ -51,14 +51,14 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(expected.issubset(names), expected - names)
 
     def test_staff_commands_are_hidden(self) -> None:
-        for root in ("giveaway", "annonce", "autoresponder", "config"):
+        for root in ("giveaway", "annonce", "autoresponder", "config", "vocal"):
             command = self.bot.tree.get_command(root)
             self.assertIsNotNone(command, root)
             self.assertIsNotNone(command.default_permissions, root)  # type: ignore[union-attr]
             self.assertEqual(command.default_permissions.value, discord.Permissions(manage_guild=True).value)  # type: ignore[union-attr]
 
     def test_staff_subcommands_have_role_check(self) -> None:
-        for root in ("giveaway", "autoresponder", "config"):
+        for root in ("giveaway", "autoresponder", "config", "vocal"):
             group = self.bot.tree.get_command(root)
             self.assertIsInstance(group, app_commands.Group)
             for subcommand in group.commands:  # type: ignore[union-attr]
@@ -92,9 +92,18 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
     def test_giveaway_manager_registered(self) -> None:
         self.assertIsNotNone(self.bot.giveaway_manager)
 
+    def test_tempvoice_manager_registered(self) -> None:
+        self.assertIsNotNone(self.bot.tempvoice)
+
+    def test_vocal_subcommands(self) -> None:
+        group = self.bot.tree.get_command("vocal")
+        self.assertIsInstance(group, app_commands.Group)
+        names = {subcommand.name for subcommand in group.commands}  # type: ignore[union-attr]
+        self.assertEqual(names, {"installer", "etat", "modele", "limite", "nettoyer", "desactiver"})
+
     def test_command_count_includes_subcommands(self) -> None:
-        # 17 commandes racine + 5 giveaways + 7 autoresponder + 4 config
-        self.assertEqual(self.bot.command_count, 33)
+        # 18 commandes racine + 5 giveaways + 7 autoresponder + 4 config + 6 vocal
+        self.assertEqual(self.bot.command_count, 40)
 
     def test_magic_ball_commands(self) -> None:
         for name in ("boule", "8ball"):

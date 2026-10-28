@@ -93,6 +93,8 @@ class ConfigGroup(app_commands.Group, name="config", description="Configurer le 
         panel_channel = guild.get_channel(int(settings["panel_channel_id"])) if settings.get("panel_channel_id") else None
         responses = db.autoresponses(guild.id)
         active = db.guild_giveaways(guild.id)
+        voice_hub = guild.get_channel(int(settings["voice_hub_id"])) if settings.get("voice_hub_id") else None
+        voice_rooms = db.guild_voice_rooms(guild.id)
         cooldown = int(settings.get("autoresponder_cooldown") or 0)
 
         emb = embed(
@@ -128,11 +130,21 @@ class ConfigGroup(app_commands.Group, name="config", description="Configurer le 
         )
         emb.add_field(name="Giveaways en cours", value=str(len(active)), inline=True)
         emb.add_field(
+            name="Vocaux temporaires",
+            value=(
+                f"{voice_hub.mention} · {len(voice_rooms)} actif(s)"
+                if voice_hub
+                else "❌ Non installé (`/vocal installer`)"
+            ),
+            inline=True,
+        )
+        emb.add_field(
             name="Commandes",
             value=(
                 "`/config salon-annonces` · salon des annonces\n"
                 "`/config reglement` · éditer le règlement\n"
                 "`/config menu` · publier le panneau du menu\n"
+                "`/vocal installer` · installer les vocaux temporaires\n"
                 "`/staffrole` · définir le rôle staff (admin)"
             ),
             inline=False,
