@@ -28,6 +28,7 @@ DEFAULT_DATA: dict[str, Any] = {
     "guilds": {},
     "giveaways": {},
     "autoresponses": {},
+    "voice_rooms": {},
 }
 
 DEFAULT_GUILD: dict[str, Any] = {
@@ -37,6 +38,12 @@ DEFAULT_GUILD: dict[str, Any] = {
     "autoresponder_cooldown": 8,
     "panel_channel_id": None,
     "created_at": None,
+    # Salons vocaux temporaires
+    "voice_hub_id": None,
+    "voice_hub_name": None,
+    "voice_category_id": None,
+    "voice_name_template": None,
+    "voice_limit": 0,
 }
 
 
@@ -231,6 +238,37 @@ class Database:
         return False
 
     # ------------------------------------------------------------------ #
+    # Salons vocaux temporaires
+    # ------------------------------------------------------------------ #
+    def voice_rooms(self) -> dict[str, dict[str, Any]]:
+        """Tous les salons vocaux temporaires, indexés par identifiant de salon."""
+        return self.data.setdefault("voice_rooms", {})
+
+    def voice_room(self, channel_id: int) -> dict[str, Any] | None:
+        return self.voice_rooms().get(str(channel_id))
+
+    def guild_voice_rooms(self, guild_id: int) -> list[dict[str, Any]]:
+        rooms = [r for r in self.voice_rooms().values() if r.get("guild_id") == guild_id]
+        return sorted(rooms, key=lambda r: r.get("created_at", 0))
+
+    def add_voice_room(self, record: dict[str, Any]) -> dict[str, Any]:
+        self.voice_rooms()[str(record["channel_id"])] = record
+        self.schedule_save(0.5)
+        return record
+
+    def remove_voice_room(self, channel_id: int) -> dict[str, Any] | None:
+        removed = self.voice_rooms().pop(str(channel_id), None)
+        if removed is not None:
+            self.schedule_save(0.5)
+        return removed
+
+    def voice_room_of(self, guild_id: int, owner_id: int) -> dict[str, Any] | None:
+        for record in self.guild_voice_rooms(guild_id):
+            if record.get("owner_id") == owner_id:
+                return record
+        return None
+
+    # ------------------------------------------------------------------ #
     # Statistiques
     # ------------------------------------------------------------------ #
     def stats(self) -> dict[str, int]:
@@ -240,6 +278,7 @@ class Database:
             "giveaways": len(self.data["giveaways"]),
             "active_giveaways": len(self.active_giveaways()),
             "autoresponses": sum(len(v) for v in self.data["autoresponses"].values()),
+            "voice_rooms": len(self.voice_rooms()),
         }
 
     @staticmethod

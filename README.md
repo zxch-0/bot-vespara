@@ -17,7 +17,8 @@ Il est **prêt à déployer sur [Render](https://render.com) via un Blueprint**
 | 📢 **Annonces** | Rédaction dans un modal, **aperçu privé** avant publication, titre/contenu markdown, couleur, image, mention `@everyone` / `@here` / rôle staff | Staff |
 | 💬 **Auto-responder** | Déclencheurs `contient` / `commence par` / `finit par` / `exact` / `regex`, sensibilité à la casse, réponse texte ou embed, activation, cooldown, test en direct | Staff |
 | 🎱 **Boule magique** | `/boule` (alias `/8ball`) : tu poses une question, la boule se secoue et répond — oui, peut-être ou non — avec 30 réponses, un bouton **Secouer à nouveau** et un cooldown anti-spam | Tout le monde |
-| 🎛️ **Menu** | Panneau à boutons : profil, infos serveur, rôles, giveaways, règlement, infos bot | Tout le monde |
+| 🎧 **Vocaux temporaires** | Le staff installe un salon générateur accessible à tous ; le rejoindre crée instantanément un vocal personnel avec un **panneau de gestion dans le chat du salon** : renommer, verrouiller, masquer, limiter les places, expulser, autoriser, transférer, récupérer, supprimer. Salon supprimé automatiquement quand il est vide | Staff (installation) · tout le monde (utilisation) |
+| 🎛️ **Menu** | Panneau à boutons : profil, infos serveur, rôles, giveaways, règlement, vocaux, infos bot | Tout le monde |
 | 🧰 **Utilitaires** | `/ping`, `/botinfo`, `/userinfo`, `/avatar`, `/banner`, `/serverinfo`, `/roleinfo`, `/rules`, `/giveaways` | Tout le monde |
 | 🩺 **Web** | `/health` pour Render, page de statut publique autonome (aucun CDN) et `/api/status` en JSON | Public |
 
@@ -44,11 +45,12 @@ un redémarrage), sauvegarde JSON atomique, arrêt propre sur `SIGTERM`.
 Remplace `TON_CLIENT_ID` (onglet *General Information*) dans ce lien :
 
 ```
-https://discord.com/api/oauth2/authorize?client_id=TON_CLIENT_ID&permissions=274878426176&scope=bot%20applications.commands
+https://discord.com/api/oauth2/authorize?client_id=TON_CLIENT_ID&permissions=274931904080&scope=bot%20applications.commands
 ```
 
 Les permissions demandées couvrent l'envoi de messages, les embeds, l'historique,
-la gestion des messages et les mentions. Ajuste-les si tu préfères.
+la gestion des messages et des salons, le déplacement de membres (vocaux
+temporaires) et les mentions. Ajuste-les si tu préfères.
 
 ### 3. Déployer
 
@@ -108,6 +110,59 @@ Deux solutions pour que le staff voie les commandes :
    `/annonce`, `/autoresponder` et `/config`.
 
 Dans les deux cas, le bot reste protégé par la vérification du rôle côté code.
+
+---
+
+## 🎧 Vocaux temporaires (« crée ton vocal »)
+
+Un membre du staff lance **une seule fois** :
+
+```
+/vocal installer [categorie] [nom] [limite]
+```
+
+Le bot crée alors un salon vocal **générateur** (par défaut **➕ Créer ton vocal**)
+visible et accessible à **tout le monde**, puis publie un message d'explication
+dans son chat.
+
+### Ce qui se passe ensuite, côté membre
+
+1. Un membre rejoint le salon générateur ;
+2. le bot crée aussitôt **son** salon vocal (nom configurable), l'y déplace et lui
+   donne les droits de gestion ;
+3. un **panneau de gestion** est publié dans le chat texte du salon créé, avec :
+
+| Bouton | Effet |
+| --- | --- |
+| ✏️ **Renommer** | Change le nom du vocal (modal) |
+| 👥 **Places** | Limite le nombre de places (0 = illimité) |
+| 🔒 **Verrouiller** / 🔓 **Déverrouiller** | Interdit / réautorise l'accès à tout le monde |
+| 🙈 **Masquer** / 👁️ **Afficher** | Rend le salon invisible / visible dans la liste |
+| 🚫 **Expulser** | Déconnecte un membre et lui bloque le salon |
+| ✅ **Autoriser** | Autorise une personne précise (même salon verrouillé) |
+| 🤝 **Transférer** | Donne la propriété du salon à un autre membre |
+| 👑 **Récupérer** | Tout membre présent peut reprendre le salon si le propriétaire est parti |
+| 🗑️ **Supprimer** | Ferme le salon (avec confirmation) |
+| 🔄 **Actualiser** | Redemande le panneau s'il a été supprimé |
+
+4. le salon est **supprimé automatiquement** dès qu'il est vide (avec un délai de
+   quelques secondes pour éviter les fausses manipes) ; si le propriétaire part
+   alors que d'autres membres restent, la propriété est **transférée**.
+
+### Commandes staff
+
+| Commande | Description |
+| --- | --- |
+| `/vocal installer [categorie] [nom] [limite] [remplacer]` | Crée (ou recrée) le salon générateur |
+| `/vocal etat` | Configuration + liste des vocaux ouverts |
+| `/vocal modele <modele>` | Nom des vocaux — variables `{user}`, `{username}`, `{count}` |
+| `/vocal limite <places>` | Places par défaut des nouveaux vocaux |
+| `/vocal nettoyer` | Répare les panneaux supprimés et les fiches orphelines |
+| `/vocal desactiver [supprimer_salons]` | Retire complètement le système |
+
+> 🔑 **Permissions du bot nécessaires :** *Gérer les salons*, *Déplacer des
+> membres* et *Envoyer des messages*. Le panneau et les boutons étant
+> **persistants**, ils fonctionnent encore après un redémarrage du bot.
 
 ---
 
@@ -176,11 +231,12 @@ ruff check .            # pip install ruff
 Astuce : ajoute ces deux commandes dans une GitHub Action pour lancer les
 tests automatiquement à chaque push.
 
-67 tests couvrent l'analyse des durées, les modes de l'auto-responder, la base
+106 tests couvrent l'analyse des durées, les modes de l'auto-responder, la base
 JSON, la page de statut, la structure des commandes (visibilité staff incluse),
 le cycle de vie complet d'un giveaway (création, participation, tirage, relance,
-suppression) et la boule magique (tirage, embeds, bouton et cooldowns), avec des
-objets Discord simulés.
+suppression), la boule magique (tirage, embeds, bouton et cooldowns) et les
+vocaux temporaires (création au join, permissions, panneau de gestion, expulsion,
+transfert, récupération, suppression automatique), avec des objets Discord simulés.
 
 ### Arborescence
 
@@ -200,10 +256,12 @@ bot/
 │   ├── menu.py          # /menu
 │   ├── utilities.py     # commandes publiques
 │   ├── fun.py           # /boule et /8ball
-│   └── settings.py      # /config ... et /staffrole
+│   ├── settings.py      # /config ... et /staffrole
+│   └── tempvoice.py     # /vocal ... (vocaux temporaires)
 ├── services/
 │   ├── giveaways.py     # logique des giveaways (tirages, refresh, reroll)
-│   └── magic_ball.py    # tirage et embeds de la boule magique
+│   ├── magic_ball.py    # tirage et embeds de la boule magique
+│   └── tempvoice.py     # création/suppression et gestion des vocaux temporaires
 └── ui/                    # vues, modals, pagination, embeds
 ```
 
@@ -242,6 +300,7 @@ bot/
 | `/config salon-annonces [salon]` | Salon par défaut des annonces |
 | `/config reglement [reinitialiser]` | Édite le règlement |
 | `/config menu [salon]` | Publie le panneau du menu |
+| `/vocal installer` · `etat` · `modele` · `limite` · `nettoyer` · `desactiver` | Vocaux temporaires (voir [Vocaux temporaires](#-vocaux-temporaires-crée-ton-vocal)) |
 | `/staffrole [rôle]` | Définit le rôle staff (admin) |
 
 ---
@@ -279,6 +338,9 @@ Les réponses se personnalisent dans `bot/constants.py` → `MAGIC8BALL_ANSWERS`
 | Les commandes staff sont invisibles pour le staff | Le rôle n'a pas la permission de visibilité → voir [Visibilité](#-visibilité-des-commandes-staff) |
 | L'auto-responder ne réagit pas | Active **Message Content Intent** dans le portail développeur |
 | `PrivilegedIntentsRequired` au démarrage | Active les intents privilégiés (message content + members) |
+| `/vocal` n'apparaît pas | Commande staff : voir [Visibilité](#-visibilité-des-commandes-staff). L'installation demande **Gérer les salons** |
+| Les membres ne sont pas déplacés dans leur vocal | Donne au bot la permission **Déplacer des membres** |
+| Le panneau d'un vocal a été supprimé | Le propriétaire clique sur **Actualiser**, ou un staff lance `/vocal nettoyer` |
 | Le bot perd ses données | Offre gratuite Render : voir [Persistance](#-persistance-des-données) |
 | Le bot est en veille | Offre gratuite Render : `SELF_PING=true` aide à le garder éveillé, sans garantie (Render peut aussi redémarrer une instance gratuite à tout moment) |
 | `Invalid token` | Token régénéré ou mal copié → mets à jour `DISCORD_TOKEN` |
