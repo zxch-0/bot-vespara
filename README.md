@@ -16,6 +16,7 @@ Il est **prêt à déployer sur [Render](https://render.com) via un Blueprint**
 | 🎁 **Giveaways** | Création avec durée libre (`1h30`, `2 jours`…), plusieurs gagnants, rôle requis, boutons **Participer / Quitter / Participants**, tirage automatique, relance, suppression | Staff |
 | 📢 **Annonces** | Rédaction dans un modal, **aperçu privé** avant publication, titre/contenu markdown, couleur, image, mention `@everyone` / `@here` / rôle staff | Staff |
 | 💬 **Auto-responder** | Déclencheurs `contient` / `commence par` / `finit par` / `exact` / `regex`, sensibilité à la casse, réponse texte ou embed, activation, cooldown, test en direct | Staff |
+| 🎱 **Boule magique** | `/boule` (alias `/8ball`) : tu poses une question, la boule se secoue et répond — oui, peut-être ou non — avec 30 réponses, un bouton **Secouer à nouveau** et un cooldown anti-spam | Tout le monde |
 | 🎛️ **Menu** | Panneau à boutons : profil, infos serveur, rôles, giveaways, règlement, infos bot | Tout le monde |
 | 🧰 **Utilitaires** | `/ping`, `/botinfo`, `/userinfo`, `/avatar`, `/banner`, `/serverinfo`, `/roleinfo`, `/rules`, `/giveaways` | Tout le monde |
 | 🩺 **Web** | `/health` pour Render, page de statut publique autonome (aucun CDN) et `/api/status` en JSON | Public |
@@ -61,7 +62,7 @@ la gestion des messages et les mentions. Ajuste-les si tu préfères.
 4. Clique sur **Deploy**. Les logs doivent finir par :
    ```
    Vespara v1.0.0 connecté en tant que Vespara#1234
-   Serveurs : 1 · Commandes : 31
+   Serveurs : 1 · Commandes : 33
    ```
 5. Invite le bot sur le serveur, va dans un salon et tape `/menu`.
 
@@ -175,10 +176,11 @@ ruff check .            # pip install ruff
 Astuce : ajoute ces deux commandes dans une GitHub Action pour lancer les
 tests automatiquement à chaque push.
 
-50 tests couvrent l'analyse des durées, les modes de l'auto-responder, la base
-JSON, la page de statut, la structure des commandes (visibilité staff incluse)
-et le cycle de vie complet d'un giveaway (création, participation, tirage,
-relance, suppression) avec des objets Discord simulés.
+67 tests couvrent l'analyse des durées, les modes de l'auto-responder, la base
+JSON, la page de statut, la structure des commandes (visibilité staff incluse),
+le cycle de vie complet d'un giveaway (création, participation, tirage, relance,
+suppression) et la boule magique (tirage, embeds, bouton et cooldowns), avec des
+objets Discord simulés.
 
 ### Arborescence
 
@@ -197,8 +199,11 @@ bot/
 │   ├── autoresponder.py # /autoresponder ...
 │   ├── menu.py          # /menu
 │   ├── utilities.py     # commandes publiques
+│   ├── fun.py           # /boule et /8ball
 │   └── settings.py      # /config ... et /staffrole
-├── services/giveaways.py  # logique des giveaways (tirages, refresh, reroll)
+├── services/
+│   ├── giveaways.py     # logique des giveaways (tirages, refresh, reroll)
+│   └── magic_ball.py    # tirage et embeds de la boule magique
 └── ui/                    # vues, modals, pagination, embeds
 ```
 
@@ -218,6 +223,7 @@ bot/
 | `/banner [membre]` | Bannière de profil |
 | `/serverinfo` | Informations du serveur |
 | `/roleinfo <rôle>` | Détails d'un rôle |
+| `/boule <question>` · `/8ball` | Pose une question à la boule magique 🎱 |
 | `/ping` · `/botinfo` | Latence et état du bot |
 
 ### Staff (`/giveaway`, `/annonce`, `/autoresponder`, `/config`)
@@ -237,6 +243,30 @@ bot/
 | `/config reglement [reinitialiser]` | Édite le règlement |
 | `/config menu [salon]` | Publie le panneau du menu |
 | `/staffrole [rôle]` | Définit le rôle staff (admin) |
+
+---
+
+## 🎱 Boule magique
+
+```
+/boule question:"Est-ce que je vais gagner au giveaway ?"
+```
+
+1. La boule affiche d'abord **« La boule se secoue… »** (≈ 1 s de suspense) ;
+2. puis la réponse s'affiche, colorée selon la tonalité :
+
+| Tonalité | Couleur | Exemples de réponses |
+| --- | --- | --- |
+| 🟢 Oui | vert | « C'est certain. », « Absolument ! », « Fonce. » |
+| 🟡 Peut-être | orange | « Je sais pas trop… », « Redemande-moi plus tard. » |
+| 🔴 Non | rouge | « Non. », « Très improbable. », « C'est mort. » |
+
+- **30 réponses** réparties équitablement entre les trois tonalités ;
+- un bouton **Secouer à nouveau** permet de retenter sans retaper la question ;
+- un cooldown de **4 s par membre** évite le spam (`/8ball` est un alias) ;
+- la question est limitée à 200 caractères et affichée dans l'embed.
+
+Les réponses se personnalisent dans `bot/constants.py` → `MAGIC8BALL_ANSWERS`.
 
 ---
 

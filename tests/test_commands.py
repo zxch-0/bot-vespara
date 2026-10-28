@@ -93,8 +93,27 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(self.bot.giveaway_manager)
 
     def test_command_count_includes_subcommands(self) -> None:
-        # 15 commandes racine + 5 giveaways + 7 autoresponder + 4 config
-        self.assertEqual(self.bot.command_count, 31)
+        # 17 commandes racine + 5 giveaways + 7 autoresponder + 4 config
+        self.assertEqual(self.bot.command_count, 33)
+
+    def test_magic_ball_commands(self) -> None:
+        for name in ("boule", "8ball"):
+            command = self.bot.tree.get_command(name)
+            self.assertIsNotNone(command, name)
+            # Commande publique : aucune permission staff requise
+            self.assertIsNone(command.default_permissions, name)  # type: ignore[union-attr]
+            # Un cooldown anti-spam est bien appliqué
+            self.assertEqual(len(command.checks), 1, name)  # type: ignore[union-attr]
+            (parameter,) = command.parameters  # type: ignore[union-attr]
+            self.assertEqual(parameter.name, "question")
+            self.assertTrue(parameter.required)
+            self.assertEqual((parameter.min_value, parameter.max_value), (3, 200))
+
+    def test_magic_ball_is_not_staff_restricted(self) -> None:
+        from bot.constants import STAFF_COMMAND_ROOTS
+
+        self.assertNotIn("boule", STAFF_COMMAND_ROOTS)
+        self.assertNotIn("8ball", STAFF_COMMAND_ROOTS)
 
     def test_custom_ids_are_unique(self) -> None:
         from bot.ui.giveaway import GiveawayView
