@@ -1,6 +1,6 @@
 [project]
 name = "vespara-bot"
-version = "1.2.0"
+version = "1.2.1"
 description = "Bot Discord Vespara : giveaways, annonces, réponses automatiques, vocaux temporaires et menu communautaire"
 requires-python = ">=3.11"
 license = { text = "MIT" }

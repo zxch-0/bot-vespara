@@ -26,7 +26,11 @@ if TYPE_CHECKING:  # pragma: no cover
     from ..main import VesparaBot
 
 PANEL_PREFIX = "vespara:tv"
-NOT_A_ROOM = "Ce panneau ne correspond pas à un salon temporaire géré par le bot."
+NOT_A_ROOM = (
+    "Impossible de rattacher ce salon au système de vocaux temporaires.\n"
+    "Vérifie que le panneau appartient bien à ce salon, ou relance "
+    "`/vocal installer` côté staff."
+)
 
 
 def get_manager(client: Any) -> TempVoiceManager | None:
@@ -47,9 +51,14 @@ class TempVoicePanel(discord.ui.View):
     def _manager(self, interaction: discord.Interaction) -> TempVoiceManager | None:
         return get_manager(interaction.client) or get_manager(self.bot)
 
-    def _channel_and_record(
+    async def _channel_and_record(
         self, interaction: discord.Interaction
     ) -> tuple[TempVoiceManager, Any, dict[str, Any]] | None:
+        """Retrouve le salon et sa fiche — en rattachant le salon au besoin.
+
+        Si la fiche a disparu (redémarrage, base éphémère…), le bot relit son
+        panneau et les permissions du salon pour le remettre dans le système.
+        """
         manager = self._manager(interaction)
         if manager is None:
             return None
@@ -58,13 +67,16 @@ class TempVoicePanel(discord.ui.View):
             channel = getattr(interaction.client, "get_channel", lambda _id: None)(interaction.channel_id)
         if channel is None:
             return None
+
         record = manager.room(channel)
+        if record is None:
+            record = await manager.adopt(channel, message=getattr(interaction, "message", None))
         if record is None:
             return None
         return manager, channel, record
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if self._channel_and_record(interaction) is None:
+        if await self._channel_and_record(interaction) is None:
             await interaction.response.send_message(embed=error(NOT_A_ROOM), ephemeral=True)
             return False
         return True
@@ -73,7 +85,7 @@ class TempVoicePanel(discord.ui.View):
         self, interaction: discord.Interaction
     ) -> tuple[TempVoiceManager, Any, dict[str, Any]] | None:
         """Comme `_channel_and_record`, mais vérifie en plus les droits de gestion."""
-        resolved = self._channel_and_record(interaction)
+        resolved = await self._channel_and_record(interaction)
         if resolved is None:
             await interaction.response.send_message(embed=error(NOT_A_ROOM), ephemeral=True)
             return None
@@ -331,7 +343,7 @@ class TempVoicePanel(discord.ui.View):
         row=2,
     )
     async def claim(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        resolved = self._channel_and_record(interaction)
+        resolved = await self._channel_and_record(interaction)
         if resolved is None:
             await interaction.response.send_message(embed=error(NOT_A_ROOM), ephemeral=True)
             return
@@ -400,7 +412,7 @@ class TempVoicePanel(discord.ui.View):
         row=2,
     )
     async def refresh(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        resolved = self._channel_and_record(interaction)
+        resolved = await self._channel_and_record(interaction)
         if resolved is None:
             await interaction.response.send_message(embed=error(NOT_A_ROOM), ephemeral=True)
             return

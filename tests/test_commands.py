@@ -99,11 +99,14 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
         group = self.bot.tree.get_command("vocal")
         self.assertIsInstance(group, app_commands.Group)
         names = {subcommand.name for subcommand in group.commands}  # type: ignore[union-attr]
-        self.assertEqual(names, {"installer", "etat", "modele", "limite", "nettoyer", "desactiver"})
+        self.assertEqual(
+            names,
+            {"installer", "etat", "modele", "limite", "rattacher", "nettoyer", "desactiver"},
+        )
 
     def test_command_count_includes_subcommands(self) -> None:
-        # 18 commandes racine + 5 giveaways + 7 autoresponder + 4 config + 6 vocal
-        self.assertEqual(self.bot.command_count, 40)
+        # 18 commandes racine + 5 giveaways + 7 autoresponder + 4 config + 7 vocal
+        self.assertEqual(self.bot.command_count, 41)
 
     def test_magic_ball_commands(self) -> None:
         for name in ("boule", "8ball"):

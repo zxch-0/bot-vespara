@@ -247,6 +247,20 @@ class VocalGroup(app_commands.Group, name="vocal", description="Installer et pil
         )
         emb.add_field(name="\u200b", value="\u200b", inline=True)
 
+        orphans = list(self.manager.candidate_channels(guild))
+        if orphans:
+            emb.add_field(
+                name=f"{EMOJI['warning']} Salons non rattachés",
+                value=truncate(
+                    "Ces vocaux ressemblent à d'anciens vocaux temporaires mais ne sont plus "
+                    "suivis par le bot :\n"
+                    + "\n".join(f"• {channel.mention}" for channel in orphans[:10])
+                    + "\n→ `/vocal rattacher` pour les remettre dans le système.",
+                    1000,
+                ),
+                inline=False,
+            )
+
         if rooms:
             lines = []
             for record in rooms[:15]:
@@ -271,6 +285,7 @@ class VocalGroup(app_commands.Group, name="vocal", description="Installer et pil
                 "`/vocal installer` · créer / recréer le salon générateur\n"
                 "`/vocal modele` · personnaliser le nom des vocaux\n"
                 "`/vocal limite` · places par défaut\n"
+                "`/vocal rattacher` · rattacher les vocaux détachés\n"
                 "`/vocal nettoyer` · réparer panneaux et fiches orphelines\n"
                 "`/vocal desactiver` · retirer complètement le système"
             ),
@@ -350,6 +365,7 @@ class VocalGroup(app_commands.Group, name="vocal", description="Installer et pil
 
         await interaction.response.defer(thinking=True, ephemeral=True)
         guild = interaction.guild
+        recovery = await self.manager.recover_guild(guild)
         removed = await self.manager.prune()
 
         repaired = 0
@@ -369,8 +385,49 @@ class VocalGroup(app_commands.Group, name="vocal", description="Installer et pil
 
         await interaction.followup.send(
             embed=success(
-                f"Fiches orphelines supprimées : **{removed}**\nPanneaux republiés : **{repaired}**",
+                f"Salons rattachés : **{recovery['adopted']}** (sur {recovery['scanned']} inspecté(s))\n"
+                f"Fiches orphelines supprimées : **{removed}**\n"
+                f"Panneaux republiés : **{repaired}**",
                 title="Nettoyage terminé",
+            ),
+            ephemeral=True,
+        )
+
+    # ------------------------------------------------------------------ #
+    @app_commands.command(
+        name="rattacher",
+        description="Rattacher au système les vocaux qui s'en sont détachés",
+    )
+    @is_staff()
+    async def rattacher(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is None:
+            await reply_ephemeral(interaction, error("Commande utilisable uniquement sur un serveur."))
+            return
+
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        guild = interaction.guild
+        hub = await self.manager.recover_hub(guild)
+        if hub is None and self.manager.hub_id(guild.id) is None:
+            await interaction.followup.send(
+                embed=warning(
+                    "Aucun salon générateur trouvé : lance d'abord `/vocal installer`.",
+                    title="Système non installé",
+                ),
+                ephemeral=True,
+            )
+            return
+
+        recovery = await self.manager.recover_guild(guild)
+        lines = [
+            f"• <#{record['channel_id']}> · <@{record['owner_id']}>"
+            for record in recovery["records"][:10]
+        ]
+
+        await interaction.followup.send(
+            embed=success(
+                f"Salons rattachés : **{recovery['adopted']}** (sur {recovery['scanned']} inspecté(s))\n"
+                + ("\n".join(lines) if lines else "\n*Aucun salon à rattacher.*"),
+                title="Rattachement terminé",
             ),
             ephemeral=True,
         )
@@ -456,6 +513,18 @@ class TempVoice(commands.Cog):
             await self.manager.prune()
         except Exception:  # pragma: no cover - jamais bloquant
             log.exception("Nettoyage des vocaux temporaires impossible")
+
+        # Un redémarrage (ou un disque éphémère) ne doit pas « détacher » les
+        # vocaux existants : on les rattache à partir de leur panneau.
+        for guild in list(getattr(self.bot, "guilds", [])):
+            try:
+                report = await self.manager.recover_guild(guild)
+                if report["adopted"]:
+                    log.warning(
+                        "%s vocal(aux) temporaire(s) rattaché(s) sur %s", report["adopted"], guild.name
+                    )
+            except Exception:  # pragma: no cover - jamais bloquant
+                log.exception("Rattachement des vocaux temporaires impossible sur %s", guild.id)
 
     @commands.Cog.listener()
     async def on_voice_state_update(
