@@ -6,6 +6,7 @@ EXTENSIONS = (
     "bot.cogs.autoresponder",
     "bot.cogs.menu",
     "bot.cogs.utilities",
+    "bot.cogs.fun",
     "bot.cogs.settings",
 )
 

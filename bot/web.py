@@ -153,6 +153,7 @@ INDEX_HTML = """<!DOCTYPE html>
         <span class="chip">/menu</span>
         <span class="chip">/rules</span>
         <span class="chip">/giveaways</span>
+        <span class="chip">/boule</span>
         <span class="chip">/userinfo</span>
         <span class="chip">/serverinfo</span>
         <span class="chip">/roleinfo</span>

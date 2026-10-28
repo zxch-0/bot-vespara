@@ -19,6 +19,7 @@ COLOR_SUCCESS: Final = 0x3BA55D
 COLOR_ERROR: Final = 0xED4245
 COLOR_WARNING: Final = 0xFAA61A
 COLOR_INFO: Final = 0x5865F2
+COLOR_MUTED: Final = 0x6B7280
 COLOR_GIVEAWAY: Final = 0xA78BFA
 COLOR_ANNOUNCE: Final = 0x7C3AED
 
@@ -126,6 +127,73 @@ AUTORESPONDER_MODES: Final[dict[str, str]] = {
     "exact": "Exactement",
     "regex": "Expression régulière",
 }
+# --------------------------------------------------------------------------- #
+# Boule magique 🎱
+# --------------------------------------------------------------------------- #
+MAGIC8BALL_ANSWERS: Final[dict[str, tuple[str, ...]]] = {
+    "oui": (
+        "Oui, sans hésiter.",
+        "C'est certain.",
+        "Absolument !",
+        "Compte là-dessus.",
+        "Oui, la boule le sent bien.",
+        "Les astres sont d'accord : oui.",
+        "Évidemment que oui.",
+        "Oui, et n'en doute plus.",
+        "Tout porte à croire que oui.",
+        "Oui ! Fonce.",
+    ),
+    "peut_etre": (
+        "Je sais pas trop…",
+        "Peut-être bien.",
+        "Impossible de le dire maintenant.",
+        "La boule hésite encore.",
+        "Redemande-moi plus tard.",
+        "Ça se joue à pile ou face.",
+        "Hmm… les signaux sont flous.",
+        "Pas impossible, mais pas gagné.",
+        "Difficile à dire, vraiment.",
+        "La boule a besoin d'un café avant de répondre.",
+    ),
+    "non": (
+        "Non.",
+        "Certainement pas.",
+        "N'y compte pas trop.",
+        "La boule dit non, désolé.",
+        "Mes sources disent non.",
+        "Très improbable.",
+        "Non, et ne reviens pas me demander.",
+        "C'est mort.",
+        "Aucune chance, à mon avis.",
+        "Non… enfin, je crois.",
+    ),
+}
+
+# Libellé de la tonalité, affiché dans le pied de l'embed
+MAGIC8BALL_TONES: Final[dict[str, str]] = {
+    "oui": "positive",
+    "peut_etre": "mitigée",
+    "non": "négative",
+}
+
+# Emoji affiché devant la réponse
+MAGIC8BALL_EMOJIS: Final[dict[str, str]] = {
+    "oui": "🟢",
+    "peut_etre": "🟡",
+    "non": "🔴",
+}
+
+MAGIC8BALL_COLORS: Final[dict[str, int]] = {
+    "oui": COLOR_SUCCESS,
+    "peut_etre": COLOR_WARNING,
+    "non": COLOR_ERROR,
+}
+
+MAGIC8BALL_EMOJI: Final = "🎱"
+MAGIC8BALL_MIN_LENGTH: Final = 3
+MAGIC8BALL_MAX_LENGTH: Final = 200
+MAGIC8BALL_COOLDOWN: Final = 4.0  # secondes entre deux questions
+
 MAX_AUTORESPONSES: Final = 50
 MAX_GIVEAWAY_DURATION: Final = 60 * 60 * 24 * 90  # 90 jours
 MIN_GIVEAWAY_DURATION: Final = 10  # secondes

@@ -273,6 +273,7 @@ def menu_embed(bot: "VesparaBot", guild: discord.Guild) -> discord.Embed:
             "`/roleinfo` · détails d'un rôle\n"
             "`/avatar` et `/banner` · images de profil\n"
             "`/giveaways` · giveaways en cours\n"
+            "`/boule` · question à la boule magique\n"
             "`/ping` et `/botinfo` · état du bot"
         ),
         inline=True,
