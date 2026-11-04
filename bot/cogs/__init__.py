@@ -7,6 +7,7 @@ EXTENSIONS = (
     "bot.cogs.menu",
     "bot.cogs.utilities",
     "bot.cogs.fun",
+    "bot.cogs.funbox",
     "bot.cogs.settings",
     "bot.cogs.tempvoice",
     "bot.cogs.economy",

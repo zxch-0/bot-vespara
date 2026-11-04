@@ -21,7 +21,9 @@ Il est **prêt à déployer sur [Render](https://render.com) via un Blueprint**
 | 🪙 **Économie** | Coins, `/eco daily` (série bonus ×7), `/eco work`, virements, classements, **niveaux XP** par message avec rôles automatiques | Tout le monde (admin : `/eco-admin`) |
 | 🛒 **Boutique** | Articles configurables par les admins : rôles, coins, tickets ou récompenses libres, avec stock, limite par membre et niveau requis. Achat par menu déroulant ou `/boutique acheter` | Tout le monde (config : staff) |
 | 🎰 **Casino** | Blackjack interactif (tirer/rester/doubler/abandonner), machine à sous animée, roulette européenne et jeu de dés — mises de 10 à 50 000 coins | Tout le monde |
-| 🎛️ **Menu** | Panneau à boutons : profil, économie, giveaways, vocaux, casino, infos serveur, rôles, règlement, infos bot | Tout le monde |
+| 🎉 **Fun** | Jauges délirantes (`/iq`, `/sus`, `/simp`, `/aura`, `/chaos`), `/ship`, `/duel`, `/pfc`, `/blague`, `/pique`, `/complimente`, `/horoscope`, `/pileouface`, `/de`, `/calin`, `/baffe`, `/tapote` et un menu `/fun` à boutons | Tout le monde |
+| 🗣️ **Le bot parle** | `/dire` fait écrire le bot dans n'importe quel salon (texte ou embed, avec épinglage), `/sondage` publie un vote à réactions, `/citation` met un message en valeur | Staff (`/dire` : admin) |
+| 🎛️ **Menu** | Panneau à boutons : profil, économie, giveaways, vocaux, casino, **fun**, infos serveur, rôles, règlement, infos bot | Tout le monde |
 | 🧰 **Utilitaires** | `/ping`, `/botinfo`, `/userinfo`, `/avatar`, `/banner`, `/serverinfo`, `/roleinfo`, `/rules`, `/giveaways` | Tout le monde |
 | 🩺 **Web** | `/health` pour Render, page de statut publique autonome (aucun CDN) et `/api/status` en JSON | Public |
 
@@ -263,6 +265,47 @@ inventaire et statistiques de jeu.
 
 ---
 
+## 🎉 Fun & bêtises
+
+Tout ce qui sert à rigoler, sans rien casser : les résultats personnels restent
+**éphémères** (toi seul les vois), les trucs à partager sont **publics** (`/duel`,
+`/pfc` en 1 contre 1, `/dire`, `/sondage`, `/citation`…) et les jauges sont
+**stables** : le même membre obtient toujours le même score.
+
+### 🗣️ Le bot parle (`/dire`, admin)
+
+- `/dire message:…` envoie **exactement** ce que tu écris, dans le salon courant ou
+  dans `salon`, et **tout le monde le voit** ;
+- options `embed` (joli cadre aux couleurs du serveur), `epingler` (épingle le
+  message) et `accent` (`violet`, `nuit`, `menthe`, `or`, `feu`, `ocean`, `rose`) ;
+- sécurité : les **mentions sont désactivées** (`@everyone`, `@here`, rôles et
+  membres restent du texte brut), les caractères invisibles sont nettoyés et les
+  messages sont limités à 1 900 caractères ;
+- `/sondage question choix1 choix2 [choix3] [choix4] [salon] [multiple]` publie un
+  sondage à réactions numérotées 1️⃣→4️⃣ ; `/citation [texte] [auteur] [salon]
+  [repondre_a]` met en avant une phrase (ou un message existant via son identifiant
+  ou son lien).
+
+### 🎲 Les classiques
+
+| Commande | Ce que ça fait |
+| --- | --- |
+| `/iq` `/sus` `/simp` `/aura` `/chaos` | Jauge stable par membre (le même membre obtient toujours le même score) : verdict, commentaire et barre de progression |
+| `/ship [membre1] [membre2]` | Pourcentage d'amour, **symétrique** (A+B = B+A) et verdict à la clé |
+| `/duel <adversaire>` | Combat animé tour par tour (attaques aléatoires, coup critique, 24 tours max) |
+| `/pfc [adversaire]` | Pierre-feuille-ciseaux contre le bot ou en **1 contre 1** avec boutons |
+| `/de [faces] [nombres]` | 2 à 100 faces, 1 à 10 dés, total et détail des lancers |
+| `/pileouface` | Pile ou face, avec la pièce qui tourne |
+| `/blague` `/pique [membre]` `/complimente [membre]` | Blagues, piques et compliments du répertoire |
+| `/horoscope [signe]` | Horoscope du jour, signe deviné depuis l'aura si tu ne le précises pas |
+| `/calin` `/baffe` `/tapote <membre>` | Interactions mignonnes (ou pas), avec une petite phrase d'ambiance |
+| `/fun` | Le menu à boutons de tout ce petit monde |
+
+> Aucun score n'est stocké : les jauges sont calculées à la volée, donc pas de
+> classement « QI » à maintenir en base — et pas de triche possible.
+
+---
+
 ## 🎨 Interface & animations
 
 - **Thème à dégradés** (`violet`, `menthe`, `or`, `ocean`, `rose`, `feu`, `nuit`) :
@@ -378,6 +421,7 @@ bot/
 │   ├── menu.py          # /menu
 │   ├── utilities.py     # commandes publiques
 │   ├── fun.py           # /boule et /8ball
+│   ├── funbox.py        # /dire, /sondage, /citation et commandes rigolotes
 │   ├── settings.py      # /config ... et /staffrole
 │   ├── tempvoice.py     # /vocal ... (vocaux temporaires)
 │   ├── economy.py       # /eco, /boutique et /eco-admin
@@ -387,7 +431,8 @@ bot/
 │   ├── magic_ball.py    # tirage et embeds de la boule magique
 │   ├── tempvoice.py     # création/suppression et gestion des vocaux temporaires
 │   ├── economy.py       # comptes, XP/niveaux, boutique, classements
-│   └── casino.py        # blackjack, machine à sous, roulette, dés (logique pure)
+│   ├── casino.py        # blackjack, machine à sous, roulette, dés (logique pure)
+│   └── fun.py           # jauges, ship, duel, RPS, dés, blagues, horoscope
 └── ui/                    # vues, modals, pagination, embeds
 ```
 
@@ -412,6 +457,12 @@ bot/
 | `/eco profil` · `/eco solde` · `/eco niveau` · `/eco classement` · `/eco daily` · `/eco work` · `/eco payer` | Économie et niveaux |
 | `/boutique voir` · `/boutique acheter` · `/boutique inventaire` | Boutique |
 | `/casino accueil` · `/casino blackjack` · `/casino slots` · `/casino roulette` · `/casino des` · `/casino jeux` · `/casino mise-max` | Casino |
+| `/fun` | Menu à boutons des commandes rigolotes |
+| `/iq` · `/sus` · `/simp` · `/aura` · `/chaos` `[membre]` | Jauges (score stable par membre) |
+| `/ship [membre1]` `[membre2]` · `/duel <membre>` · `/pfc [membre]` | Amour, combat animé, pierre-feuille-ciseaux |
+| `/blague` · `/pique [membre]` · `/complimente [membre]` · `/horoscope [signe]` | Blagues, piques, compliments, horoscope |
+| `/calin <membre>` · `/baffe <membre>` · `/tapote <membre>` | Interactions du quotidien |
+| `/pileouface` · `/de [faces] [nombres]` | Pile ou face, lancers de dés |
 
 ### Staff (`/giveaway`, `/annonce`, `/autoresponder`, `/config`)
 
@@ -431,6 +482,9 @@ bot/
 | `/config menu [salon]` | Publie le panneau du menu |
 | `/eco-admin donner/retirer/xp/article-*/recompense/parametres/reinitialiser/etat` | Économie, boutique et niveaux |
 | `/vocal installer` · `etat` · `modele` · `limite` · `rattacher` · `nettoyer` · `desactiver` | Vocaux temporaires (voir [Vocaux temporaires](#-vocaux-temporaires-crée-ton-vocal)) |
+| `/dire <message> [salon] [embed] [epingler] [accent]` | Fait parler le bot — **admin uniquement**, message visible par tout le monde |
+| `/sondage <question> <choix1> <choix2> [choix3] [choix4] [salon] [multiple]` | Publie un sondage à réactions |
+| `/citation [texte] [auteur] [salon] [repondre_a]` | Publie une citation mise en valeur |
 | `/staffrole [rôle]` | Définit le rôle staff (admin) |
 
 ---

@@ -366,7 +366,8 @@ def menu_embed(bot: "VesparaBot", guild: discord.Guild) -> discord.Embed:
             "`/giveaways` · giveaways en cours\n"
             "`/boule` · boule magique 🎱\n"
             "`/casino accueil` · jeux de coins\n"
-            "`/eco daily` · récompense du jour"
+            "`/eco daily` · récompense du jour\n"
+            "`/fun` · commandes rigolotes 🎉"
         ),
         inline=True,
     )

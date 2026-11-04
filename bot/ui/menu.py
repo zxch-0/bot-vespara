@@ -39,6 +39,7 @@ class MenuView(discord.ui.View):
             ("giveaways", "Giveaways", EMOJI["gift"], discord.ButtonStyle.secondary, self.show_giveaways),
             ("voice", "Vocaux", EMOJI["mic"], discord.ButtonStyle.secondary, self.show_voice),
             ("casino", "Casino", "🎲", discord.ButtonStyle.secondary, self.show_casino),
+            ("fun", "Fun", "🎉", discord.ButtonStyle.secondary, self.show_fun),
             ("server", "Le serveur", "🏰", discord.ButtonStyle.secondary, self.show_server),
             ("roles", "Rôles", "🎭", discord.ButtonStyle.secondary, self.show_roles),
             ("rules", "Règlement", EMOJI["book"], discord.ButtonStyle.secondary, self.show_rules),
@@ -118,6 +119,11 @@ class MenuView(discord.ui.View):
             view=CasinoView(self.bot, guild, interaction.user.id),
             ephemeral=True,
         )
+
+    async def show_fun(self, interaction: discord.Interaction) -> None:
+        from .fun import fun_menu_embed
+
+        await interaction.response.send_message(embed=fun_menu_embed(), ephemeral=True)
 
     async def show_voice(self, interaction: discord.Interaction) -> None:
         guild = await self._guild(interaction)

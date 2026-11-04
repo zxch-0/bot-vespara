@@ -132,6 +132,8 @@ STAFF_COMMAND_ROOTS: Final[dict[str, str]] = {
     "config": "Configuration du serveur",
     "vocal": "Salons vocaux temporaires",
     "eco-admin": "Administration de l'économie",
+    "sondage": "Publication de sondages",
+    "citation": "Publication de citations",
 }
 
 # --------------------------------------------------------------------------- #
