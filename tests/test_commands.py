@@ -128,8 +128,8 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(subcommand.checks)
 
     def test_command_count_includes_subcommands(self) -> None:
-        # 22 commandes racine + sous-commandes (giveaway, vocal, eco, boutique, casino…)
-        self.assertEqual(self.bot.command_count, 73)
+        # 43 commandes racine + sous-commandes (giveaway, vocal, eco, boutique, casino…)
+        self.assertEqual(self.bot.command_count, 94)
 
     def test_magic_ball_commands(self) -> None:
         for name in ("boule", "8ball"):

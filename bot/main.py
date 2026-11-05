@@ -130,9 +130,12 @@ class VesparaBot(commands.Bot):
             self.settings.staff_permission_label,
         )
 
-        staffrole = self.tree.get_command("staffrole")
-        if staffrole is not None:
-            staffrole.default_permissions = discord.Permissions(administrator=True)  # type: ignore[union-attr]
+        # Commandes visibles uniquement par les administrateurs (ou owner du bot)
+        admin_only = discord.Permissions(administrator=True)
+        for root in ("staffrole", "dire"):
+            command = self.tree.get_command(root)
+            if command is not None:
+                command.default_permissions = admin_only  # type: ignore[union-attr]
 
     async def sync_commands(self) -> None:
         """Synchronise les slash commands (serveur de test prioritaire)."""
