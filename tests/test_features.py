@@ -397,10 +397,9 @@ class AnnouncementTests(unittest.IsolatedAsyncioTestCase):
         self.db = Database(Path(self.tmp.name) / "db.json")
         self.channel = FakeChannel()
         self.bot = FakeBot(self.db, self.channel)
+        # Nouveau : le bot parle en message simple, pas d'embed
         self.draft = AnnouncementDraft(
-            title="Soirée jeux",
             content="Ce samedi à 21h !",
-            color=0x8B5CF6,
         )
         self.preview = AnnouncementPreview(
             self.bot,  # type: ignore[arg-type]
@@ -415,10 +414,10 @@ class AnnouncementTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     def test_embed_contains_draft(self) -> None:
+        # L'apercu reste un embed prive, mais l'envoi final est un message brut
         emb = self.draft.to_embed(FakeAnnounceUser())  # type: ignore[arg-type]
-        self.assertEqual(emb.title, "Soirée jeux")
         self.assertEqual(emb.description, "Ce samedi à 21h !")
-        self.assertEqual(emb.author.name, "Staffeur")
+        self.assertIn("Annonce", emb.title)
 
     async def test_publish_sends_and_confirms(self) -> None:
         interaction = FakeAnnounceInteraction()
@@ -426,11 +425,29 @@ class AnnouncementTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(self.channel.sent), 1)
         payload = self.channel.sent[0]
-        self.assertEqual(payload["content"], "@everyone")
-        self.assertEqual(payload["embed"].title, "Soirée jeux")
+        # Le bot envoie un message normal (plain text), pas un embed
+        self.assertEqual(payload["content"], "@everyone\nCe samedi à 21h !")
+        self.assertIsNone(payload.get("embed"))
         self.assertTrue(payload["allowed_mentions"].everyone)
         self.assertIn("envoyée", interaction.response.edited["embed"].title.lower())
         self.assertTrue(all(item.disabled for item in self.preview.children))
+
+    async def test_publish_without_mention(self) -> None:
+        from bot.ui.announcement import AnnouncementDraft, AnnouncementPreview
+
+        draft = AnnouncementDraft(content="Hello le serveur !")
+        preview = AnnouncementPreview(
+            self.bot,  # type: ignore[arg-type]
+            draft=draft,
+            channel=self.channel,  # type: ignore[arg-type]
+            mention_text=None,
+            author_id=5,
+        )
+        interaction = FakeAnnounceInteraction()
+        await preview.publish.callback(interaction)  # type: ignore[attr-defined]
+        payload = self.channel.sent[-1]
+        self.assertEqual(payload["content"], "Hello le serveur !")
+        self.assertFalse(payload["allowed_mentions"].everyone)
 
     async def test_cancel_does_nothing(self) -> None:
         interaction = FakeAnnounceInteraction()

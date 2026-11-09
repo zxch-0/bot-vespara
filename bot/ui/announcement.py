@@ -1,4 +1,4 @@
-"""Modal de rédaction et aperçu d'une annonce."""
+"""Modal de rédaction et aperçu d'une annonce en message simple (pas d'embed)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import discord
 
-from ..constants import COLOR_ANNOUNCE, EMOJI, FOOTER
+from ..constants import EMOJI
 from ..helpers import embed, error, reply_error, success
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -16,26 +16,54 @@ if TYPE_CHECKING:  # pragma: no cover
 
 @dataclass(slots=True)
 class AnnouncementDraft:
-    title: str
+    """Contenu brut qui sera envoyé tel quel par le bot."""
+
     content: str
-    color: int = COLOR_ANNOUNCE
+    # Champs legacy conservés pour compatibilité (ancien système titre/couleur/image)
+    title: str | None = None
+    color: int | None = None
     image_url: str | None = None
 
-    def to_embed(self, author: discord.abc.User) -> discord.Embed:
-        emb = embed(
-            title=self.title or "📢 Annonce",
+    def __post_init__(self) -> None:
+        # Compat : si l'ancien code passait title+content, on fusionne
+        # title est ignoré pour l'envoi, mais on garde la compat.
+        if self.title and not self.content:
+            self.content = self.title
+            self.title = None
+        # Si les deux sont fournis (ancien embed), le contenu reste le principal
+
+    def to_preview_embed(self, channel: discord.abc.GuildChannel | discord.TextChannel) -> discord.Embed:
+        """Embed d'aperçu privé (ne sera jamais publié) — juste pour confirmer."""
+        return embed(
+            title=f"{EMOJI['megaphone']} Aperçu de l'annonce",
             description=self.content or "*Aucun contenu.*",
-            color=self.color,
-            footer=FOOTER,
+            color=0x8B5CF6,
         )
-        emb.set_author(name=author.display_name, icon_url=author.display_avatar.url)
+
+    # Compat : ancien code appelait to_embed(author) — on garde un alias
+    # pour ne pas casser les tests externes qui importeraient encore l'ancienne API.
+    def to_embed(self, author: discord.abc.User | None = None) -> discord.Embed:  # type: ignore[override]
+        # Ancien comportement : titre + description
+        title = self.title or "📢 Annonce"
+        desc = self.content or "*Aucun contenu.*"
+        # Si on a un title legacy, on l'utilise comme titre d'embed
+        emb = embed(
+            title=title,
+            description=desc,
+            color=self.color or 0x8B5CF6,
+        )
         if self.image_url:
             emb.set_image(url=self.image_url)
+        if author is not None:
+            try:
+                emb.set_author(name=author.display_name, icon_url=author.display_avatar.url)  # type: ignore[union-attr]
+            except Exception:
+                pass
         return emb
 
 
 class AnnouncementModal(discord.ui.Modal):
-    """Formulaire de rédaction (titre + contenu)."""
+    """Formulaire de rédaction : un seul champ, le message à envoyer."""
 
     def __init__(
         self,
@@ -43,8 +71,6 @@ class AnnouncementModal(discord.ui.Modal):
         *,
         channel: discord.TextChannel,
         mention_text: str | None,
-        color: int,
-        image_url: str | None,
         initial: AnnouncementDraft | None = None,
         preview_message: discord.Message | None = None,
     ) -> None:
@@ -52,35 +78,24 @@ class AnnouncementModal(discord.ui.Modal):
         self.bot = bot
         self.channel = channel
         self.mention_text = mention_text
-        self.color = color
-        self.image_url = image_url
         self.preview_message = preview_message
 
-        self.title_input = discord.ui.TextInput(
-            label="Titre",
-            placeholder="Ex : Soirée jeux ce samedi !",
-            max_length=200,
-            required=True,
-            default=initial.title if initial else None,
-        )
         self.content_input = discord.ui.TextInput(
-            label="Contenu",
-            placeholder="Décris l'annonce… (le markdown Discord est accepté)",
+            label="Message",
+            placeholder="Tape le message que le bot doit envoyer… (markdown accepté)",
             style=discord.TextStyle.paragraph,
-            max_length=3800,
+            max_length=2000,
             required=True,
             default=initial.content if initial else None,
         )
-        self.add_item(self.title_input)
         self.add_item(self.content_input)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        draft = AnnouncementDraft(
-            title=str(self.title_input.value).strip(),
-            content=str(self.content_input.value).strip(),
-            color=self.color,
-            image_url=self.image_url,
-        )
+        draft = AnnouncementDraft(content=str(self.content_input.value).strip())
+        if not draft.content:
+            await reply_error(interaction, "Le message ne peut pas être vide.")
+            return
+
         preview = AnnouncementPreview(
             self.bot,
             draft=draft,
@@ -88,13 +103,21 @@ class AnnouncementModal(discord.ui.Modal):
             mention_text=self.mention_text,
             author_id=interaction.user.id,
         )
-        emb = draft.to_embed(interaction.user)
+        # Embed d'aperçu privé — montre le salon cible + le contenu
+        preview_emb = embed(
+            title=f"{EMOJI['megaphone']} Aperçu — salon {self.channel.mention}",
+            description=draft.content,
+            color=0x8B5CF6,
+        )
+        if self.mention_text:
+            preview_emb.add_field(name="Mention", value=self.mention_text, inline=False)
+        preview_emb.set_footer(text="Ce message sera envoyé tel quel par le bot (sans embed).")
 
         if self.preview_message is not None:
             try:
                 await interaction.response.edit_message(
-                    content=f"{EMOJI['info']} Aperçu — salon {self.channel.mention}",
-                    embed=emb,
+                    content=None,
+                    embed=preview_emb,
                     view=preview,
                 )
                 return
@@ -102,8 +125,7 @@ class AnnouncementModal(discord.ui.Modal):
                 pass
 
         await interaction.response.send_message(
-            content=f"{EMOJI['info']} Aperçu — salon {self.channel.mention}",
-            embed=emb,
+            embed=preview_emb,
             view=preview,
             ephemeral=True,
         )
@@ -113,7 +135,7 @@ class AnnouncementModal(discord.ui.Modal):
 
 
 class AnnouncementPreview(discord.ui.View):
-    """Aperçu privé avec Publication / Modification / Annulation."""
+    """Aperçu privé avec Publication / Modification / Annulation — envoi en message brut."""
 
     def __init__(
         self,
@@ -141,16 +163,30 @@ class AnnouncementPreview(discord.ui.View):
             return False
         return True
 
+    def _full_content(self) -> str:
+        if self.mention_text:
+            return f"{self.mention_text}\n{self.draft.content}"
+        return self.draft.content
+
     @discord.ui.button(label="Publier", emoji="📣", style=discord.ButtonStyle.success)
     async def publish(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         allowed_mentions = discord.AllowedMentions.none()
         if self.mention_text:
             allowed_mentions = discord.AllowedMentions(everyone=True, roles=True, users=True)
 
+        full_content = self._full_content()
+
+        # Discord limite à 2000 caractères par message — on le vérifie côté bot
+        if len(full_content) > 2000:
+            await reply_error(
+                interaction,
+                f"Le message est trop long ({len(full_content)} caractères, max 2000). Raccourcis-le.",
+            )
+            return
+
         try:
             message = await self.channel.send(
-                content=self.mention_text,
-                embed=self.draft.to_embed(interaction.user),
+                content=full_content,
                 allowed_mentions=allowed_mentions,
             )
         except discord.Forbidden:
@@ -165,13 +201,14 @@ class AnnouncementPreview(discord.ui.View):
 
         for item in self.children:
             item.disabled = True  # type: ignore[attr-defined]
+        jump_url = getattr(message, "jump_url", None)
+        if jump_url:
+            desc = f"Message envoyé dans {self.channel.mention} !\n→ [Voir le message]({jump_url})"
+        else:
+            desc = f"Message envoyé dans {self.channel.mention} !"
         await interaction.response.edit_message(
             content=None,
-            embed=success(
-                f"Annonce publiée dans {self.channel.mention} !\n"
-                f"→ [Voir le message]({message.jump_url})",
-                title="Annonce envoyée",
-            ),
+            embed=success(desc, title="Annonce envoyée"),
             view=self,
         )
         self.stop()
@@ -182,8 +219,6 @@ class AnnouncementPreview(discord.ui.View):
             self.bot,
             channel=self.channel,
             mention_text=self.mention_text,
-            color=self.draft.color,
-            image_url=self.draft.image_url,
             initial=self.draft,
             preview_message=interaction.message,
         )
