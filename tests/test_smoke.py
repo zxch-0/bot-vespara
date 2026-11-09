@@ -30,6 +30,23 @@ class _Asset:
     url = "https://cdn.discord.test/avatar.png"
 
 
+class FakeInvite:
+    def __init__(
+        self,
+        inviter: Any,
+        *,
+        url: str = "https://discord.gg/test",
+        max_uses: int = 0,
+        uses: int = 0,
+        expires_at: dt.datetime | None = None,
+    ) -> None:
+        self.inviter = inviter
+        self.url = url
+        self.max_uses = max_uses
+        self.uses = uses
+        self.expires_at = expires_at
+
+
 class FakeRole:
     def __init__(self, role_id: int = 0, name: str = "Rôle") -> None:
         self.id = role_id
@@ -123,6 +140,7 @@ class FakeGuild:
         self.banner = None
         self.channels: dict[int, FakeChannel] = {}
         self._members: dict[int, FakeMember] = {}
+        self._invites: list[Any] = []
 
     @property
     def me(self) -> FakeMember:
@@ -145,6 +163,9 @@ class FakeGuild:
 
     def get_member(self, member_id: int) -> FakeMember | None:
         return self._members.get(int(member_id))
+
+    async def invites(self) -> list[Any]:
+        return list(self._invites)
 
     def get_channel(self, channel_id: int) -> FakeChannel | None:
         return self.channels.get(int(channel_id))
@@ -231,6 +252,11 @@ class SmokeTests(unittest.IsolatedAsyncioTestCase):
         self.other = self.guild.add_member(FakeMember(43, self.guild, "Max"))
         self.role = FakeRole(77, "Actif")
         self.guild.roles.append(self.role)
+        self.guild._invites = [
+            FakeInvite(self.owner, url="https://discord.gg/vespara"),
+            FakeInvite(self.owner, url="https://discord.gg/vespara-2", max_uses=5, uses=2),
+            FakeInvite(self.other, url="https://discord.gg/vespara-3"),
+        ]
 
     async def asyncTearDown(self) -> None:
         await self.bot.close()
@@ -420,6 +446,33 @@ class SmokeTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(command=name):
                 await command.callback(self.bot.get_cog("Utilities"), interaction, **kwargs)  # type: ignore[union-attr]
                 self.assert_answered(interaction)
+
+    async def test_invites_commands(self) -> None:
+        interaction = await self.call("invites", "lien")
+        self.assert_answered(interaction)
+        self.assertIn("discord.gg/vespara", str(interaction.response.sent[0]["embed"].description))
+
+        interaction = await self.call("invites", "classement")
+        self.assert_answered(interaction)
+        embed = interaction.response.sent[0]["embed"]
+        self.assertIn("Léa", embed.description)
+        self.assertIn("Max", embed.description)
+
+        interaction = await self.call("invites", "stats")
+        self.assert_answered(interaction)
+
+        interaction = await self.call("invites", "stats", self.other)
+        self.assert_answered(interaction)
+
+        # Serveur sans aucune invitation : message propre, pas d'exception.
+        self.guild._invites = []
+        interaction = await self.call("invites", "lien")
+        self.assert_answered(interaction)
+        self.assertIn("Aucun lien", str(interaction.response.sent[0]["embed"].title))
+
+        interaction = await self.call("invites", "classement")
+        self.assert_answered(interaction)
+        self.assertIn("Aucune invitation", interaction.response.sent[0]["embed"].description)
 
     # ------------------------------------------------------------------ #
     def test_tempvoice_grace_period(self) -> None:

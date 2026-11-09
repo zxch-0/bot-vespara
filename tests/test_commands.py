@@ -46,6 +46,7 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
             "roleinfo",
             "rules",
             "giveaways",
+            "invites",
         }
         names = {command.name for command in self.bot.tree.get_commands()}
         self.assertTrue(expected.issubset(names), expected - names)
@@ -75,7 +76,7 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(command.checks)  # type: ignore[union-attr]
 
     def test_public_commands_are_not_restricted(self) -> None:
-        for name in ("menu", "ping", "rules", "avatar"):
+        for name in ("menu", "ping", "rules", "avatar", "invites"):
             command = self.bot.tree.get_command(name)
             self.assertIsNone(command.default_permissions, name)  # type: ignore[union-attr]
 
@@ -104,12 +105,24 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
             {"installer", "etat", "modele", "limite", "rattacher", "nettoyer", "desactiver"},
         )
 
+    def test_invites_group_structure(self) -> None:
+        group = self.bot.tree.get_command("invites")
+        self.assertIsInstance(group, app_commands.Group)
+        self.assertIsNone(group.default_permissions)  # type: ignore[union-attr]
+        names = {subcommand.name for subcommand in group.commands}  # type: ignore[union-attr]
+        self.assertEqual(names, {"lien", "classement", "stats"})
+
+        stats = next(sub for sub in group.commands if sub.name == "stats")  # type: ignore[union-attr]
+        (parameter,) = stats.parameters  # type: ignore[union-attr]
+        self.assertEqual(parameter.name, "membre")
+        self.assertFalse(parameter.required)
+
     def test_economy_managers_registered(self) -> None:
         self.assertIsNotNone(self.bot.economy)
         self.assertIsNotNone(getattr(self.bot, "economy", None))
 
     def test_public_groups_are_open(self) -> None:
-        for name in ("eco", "boutique", "casino"):
+        for name in ("eco", "boutique", "casino", "invites"):
             command = self.bot.tree.get_command(name)
             self.assertIsInstance(command, app_commands.Group, name)
             self.assertIsNone(command.default_permissions, name)  # type: ignore[union-attr]
@@ -128,8 +141,8 @@ class CommandTreeTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(subcommand.checks)
 
     def test_command_count_includes_subcommands(self) -> None:
-        # 22 commandes racine + sous-commandes (giveaway, vocal, eco, boutique, casino…)
-        self.assertEqual(self.bot.command_count, 73)
+        # 23 commandes racine + sous-commandes (giveaway, vocal, eco, boutique, casino, invites…)
+        self.assertEqual(self.bot.command_count, 77)
 
     def test_magic_ball_commands(self) -> None:
         for name in ("boule", "8ball"):

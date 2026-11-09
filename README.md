@@ -21,6 +21,7 @@ Il est **prêt à déployer sur [Render](https://render.com) via un Blueprint**
 | 🪙 **Économie** | Coins, `/eco daily` (série bonus ×7), `/eco work`, virements, classements, **niveaux XP** par message avec rôles automatiques | Tout le monde (admin : `/eco-admin`) |
 | 🛒 **Boutique** | Articles configurables par les admins : rôles, coins, tickets ou récompenses libres, avec stock, limite par membre et niveau requis. Achat par menu déroulant ou `/boutique acheter` | Tout le monde (config : staff) |
 | 🎰 **Casino** | Blackjack interactif (tirer/rester/doubler/abandonner), machine à sous animée, roulette européenne et jeu de dés — mises de 10 à 50 000 coins | Tout le monde |
+| 🤝 **Invitations** | `/invites lien` (lien du serveur), `/invites classement` (top des membres qui ont le plus invité) et `/invites stats [membre]` (nombre, rang, lien actif) | Tout le monde |
 | 🎛️ **Menu** | Panneau à boutons : profil, économie, giveaways, vocaux, casino, infos serveur, rôles, règlement, infos bot | Tout le monde |
 | 🧰 **Utilitaires** | `/ping`, `/botinfo`, `/userinfo`, `/avatar`, `/banner`, `/serverinfo`, `/roleinfo`, `/rules`, `/giveaways` | Tout le monde |
 | 🩺 **Web** | `/health` pour Render, page de statut publique autonome (aucun CDN) et `/api/status` en JSON | Public |
@@ -263,6 +264,23 @@ inventaire et statistiques de jeu.
 
 ---
 
+## 🤝 Invitations
+
+| Commande | Description |
+| --- | --- |
+| `/invites lien` | Lien d'invitation actif du serveur (cliquable + copiable, avec créateur, utilisations et expiration) |
+| `/invites classement` | Classement des membres qui ont le plus invité : **top 100**, podium 🥇🥈🥉, barres animées, paginé |
+| `/invites stats [membre]` | Statistiques d'un membre (par défaut : toi) : invitations actives, rang, son lien actif |
+
+- Le classement compte les **invitations actives** (ni expirées, ni épuisées,
+  ni supprimées) : quand une invitation est acceptée et disparaît, le compteur
+  retombe.
+- Ces commandes lisent la liste des invitations du serveur via l'API Discord :
+  le rôle du bot doit avoir la permission **Gérer le serveur**. Sans elle, la
+  commande l'explique proprement au membre.
+
+---
+
 ## 🎨 Interface & animations
 
 - **Thème à dégradés** (`violet`, `menthe`, `or`, `ocean`, `rose`, `feu`, `nuit`) :
@@ -346,16 +364,17 @@ ruff check .            # pip install ruff
 Astuce : ajoute ces deux commandes dans une GitHub Action pour lancer les
 tests automatiquement à chaque push.
 
-192 tests couvrent l'analyse des durées, les modes de l'auto-responder, la base
+216 tests couvrent l'analyse des durées, les modes de l'auto-responder, la base
 JSON, la page de statut, la structure des commandes (visibilité staff incluse),
 le cycle de vie complet d'un giveaway (création, participation, tirage, relance,
 suppression), la boule magique (tirage, embeds, bouton et cooldowns) et les
 vocaux temporaires (création au join, permissions, panneau de gestion, expulsion,
 transfert, récupération, suppression automatique, **rattachement des salons après
 perte de la base**), l'**économie** (courbe d'XP, daily/work, virements, boutique,
-classements, récompenses de niveau) et le **casino** (distributions, as, blackjack,
-double, abandon, jackpots, couleurs et paris de la roulette, dés), avec des objets
-Discord simulés.
+classements, récompenses de niveau), le **casino** (distributions, as, blackjack,
+double, abandon, jackpots, couleurs et paris de la roulette, dés) et les
+**invitations** (comptage par membre, sélection du lien, classement et stats),
+avec des objets Discord simulés.
 
 Un script de fumée (`tests/test_smoke.py`) exécute **toutes les commandes** avec des
 interactions simulées pour détecter les erreurs de rendu.
@@ -378,6 +397,7 @@ bot/
 │   ├── menu.py          # /menu
 │   ├── utilities.py     # commandes publiques
 │   ├── fun.py           # /boule et /8ball
+│   ├── invites.py       # /invites (lien, stats, classement des inviters)
 │   ├── settings.py      # /config ... et /staffrole
 │   ├── tempvoice.py     # /vocal ... (vocaux temporaires)
 │   ├── economy.py       # /eco, /boutique et /eco-admin
@@ -412,6 +432,7 @@ bot/
 | `/eco profil` · `/eco solde` · `/eco niveau` · `/eco classement` · `/eco daily` · `/eco work` · `/eco payer` | Économie et niveaux |
 | `/boutique voir` · `/boutique acheter` · `/boutique inventaire` | Boutique |
 | `/casino accueil` · `/casino blackjack` · `/casino slots` · `/casino roulette` · `/casino des` · `/casino jeux` · `/casino mise-max` | Casino |
+| `/invites lien` · `/invites classement` · `/invites stats [membre]` | Lien d'invitation, top des inviters et stats |
 
 ### Staff (`/giveaway`, `/annonce`, `/autoresponder`, `/config`)
 
