@@ -22,6 +22,7 @@ Il est **prêt à déployer sur [Render](https://render.com) via un Blueprint**
 | 🛒 **Boutique** | Articles configurables par les admins : rôles, coins, tickets ou récompenses libres, avec stock, limite par membre et niveau requis. Achat par menu déroulant ou `/boutique acheter` | Tout le monde (config : staff) |
 | 🎰 **Casino** | Blackjack interactif (tirer/rester/doubler/abandonner), machine à sous animée, roulette européenne et jeu de dés — mises de 10 à 50 000 coins | Tout le monde |
 | 🤝 **Invitations** | `/invites lien` (lien du serveur), `/invites classement` (top des membres qui ont le plus invité) et `/invites stats [membre]` (nombre, rang, lien actif) | Tout le monde |
+| 🏗️ **`/build`** | Construit un serveur complet en une commande : catégories, salon **règlement** avec embed, **annonces**, **commandes bot**, **pings**, médias, niveaux, casino, vocaux (dont générateur temporaire) et **5 salons de logs staff** — chaque salon nommé `-➠˗ˏˋ🎐┆𝑃𝑖𝑛𝑔𝑠ˎˊ˗`, permissions posées et salons enregistrés dans la config | Administrateur |
 | 🎛️ **Menu** | Panneau à boutons : profil, économie, giveaways, vocaux, casino, infos serveur, rôles, règlement, infos bot | Tout le monde |
 | 🧰 **Utilitaires** | `/ping`, `/botinfo`, `/userinfo`, `/avatar`, `/banner`, `/serverinfo`, `/roleinfo`, `/rules`, `/giveaways` | Tout le monde |
 | 🩺 **Web** | `/health` pour Render, page de statut publique autonome (aucun CDN) et `/api/status` en JSON | Public |
@@ -187,6 +188,60 @@ perdue. Les vocaux encore rattachés n'ont donc plus besoin d'être recréés.
 > 🔑 **Permissions du bot nécessaires :** *Gérer les salons*, *Déplacer des
 > membres* et *Envoyer des messages*. Le panneau et les boutons étant
 > **persistants**, ils fonctionnent encore après un redémarrage du bot.
+
+---
+
+## 🏗️ `/build` — construire un serveur complet
+
+```
+/build                      → demande une confirmation puis construit tout
+/build apercu:True          → affiche le plan détaillé, ne crée rien
+/build confirmer:True       → construit sans demander de confirmation
+/build regles:False logs:False vocal:False economie:False
+/build texte_regles:"1 · Sois sympa\n2 · Pas de spam"
+```
+
+### Ce qui est créé
+
+Chaque salon suit le thème du bot : `-➠˗ˏˋ🎐┆𝑃𝑖𝑛𝑔𝑠ˎˊ˗`
+(les catégories n'ont pas la flèche : `˗ˏˋ📌┆𝐼𝑛𝑓𝑜𝑟𝑚𝑎𝑡𝑖𝑜𝑛𝑠ˎˊ˗`).
+
+| Catégorie | Salons | Accès |
+| --- | --- | --- |
+| 📌 Informations | `📜 Règles` (embed de règlement), `📢 Annonces`, `🎁 Giveaways`, `🤝 Partenariats` | Lecture seule *(le staff écrit)* |
+| 💬 Communauté | `💬 Général`, `🎐 Pings`, `📸 Médias`, `🤖 Commandes-bot`, `📊 Niveaux`, `🎰 Casino` | Tout le monde (`Pings`, `Niveaux` en lecture seule) |
+| 🎧 Vocaux | `🔊 Vocal général`, `🎮 Gaming`, `➕ Créer ton vocal` (générateur temporaire) | Tout le monde |
+| 🛡️ Staff | `🛡️ Staff`, `📝 Logs-messages`, `🚪 Logs-membres`, `🔨 Logs-sanctions`, `🎙️ Logs-vocaux`, `⚙️ Logs-bot` | Staff uniquement |
+
+Chaque salon textuel reçoit un **message d'accueil** (explication du salon,
+commandes utiles, rappel du règlement). Le règlement est enregistré dans la base :
+`/rules` l'affiche tel quel, et `/config reglement` permet de le modifier ensuite.
+
+### Ce que `/build` configure tout seul
+
+- **Salon des annonces** → `/config salon-annonces` est déjà rempli ;
+- **Salon des niveaux** (`levelup_channel_id`) et **salon du casino** (`casino_channel_id`) ;
+- **Générateur de vocaux temporaires** (`voice_hub_id`, catégorie, modèle, limite) :
+  le système de vocaux est **immédiatement opérationnel**, sans `/vocal installer` ;
+- **Règlement** du serveur (sauf s'il est déjà personnalisé).
+
+### Points importants
+
+- **Aucun doublon** : un salon qui porte déjà le bon nom est **réutilisé**, et son
+  contenu n'est pas modifié. `/build` peut donc être relancé pour compléter un
+  serveur après en avoir supprimé des salons.
+- **Rien n'est supprimé** : la commande ne fait qu'ajouter ou réutiliser.
+- La commande est réservée aux **administrateurs** et une confirmation est
+  demandée avant de créer plus de 10 salons.
+- Sans rôle staff configuré, les salons staff restent visibles par les
+  administrateurs : lance `/staffrole` puis relance `/build` pour appliquer les
+  bonnes permissions.
+- Une pause de 0,35 s sépare chaque création de salon pour respecter les limites
+  de Discord (≈ 15 salons / 10 min sur un serveur neuf : le bot patiente
+  automatiquement en cas de 429, la commande peut prendre une minute).
+
+> 🔑 **Permissions du bot nécessaires :** *Gérer les salons* (sinon la commande
+> s'arrête avec un message clair) + *Envoyer des messages* et *Intégrer des liens*.
 
 ---
 
@@ -399,6 +454,7 @@ bot/
 │   ├── fun.py           # /boule et /8ball
 │   ├── invites.py       # /invites (lien, stats, classement des inviters)
 │   ├── settings.py      # /config ... et /staffrole
+│   ├── build.py         # /build (construction d'un serveur complet)
 │   ├── tempvoice.py     # /vocal ... (vocaux temporaires)
 │   ├── economy.py       # /eco, /boutique et /eco-admin
 │   └── casino.py        # /casino (blackjack, slots, roulette, dés)
@@ -406,6 +462,7 @@ bot/
 │   ├── giveaways.py     # logique des giveaways (tirages, refresh, reroll)
 │   ├── magic_ball.py    # tirage et embeds de la boule magique
 │   ├── tempvoice.py     # création/suppression et gestion des vocaux temporaires
+│   ├── serverbuild.py   # plan, noms stylisés et création des salons de /build
 │   ├── economy.py       # comptes, XP/niveaux, boutique, classements
 │   └── casino.py        # blackjack, machine à sous, roulette, dés (logique pure)
 └── ui/                    # vues, modals, pagination, embeds
@@ -452,6 +509,7 @@ bot/
 | `/config menu [salon]` | Publie le panneau du menu |
 | `/eco-admin donner/retirer/xp/article-*/recompense/parametres/reinitialiser/etat` | Économie, boutique et niveaux |
 | `/vocal installer` · `etat` · `modele` · `limite` · `rattacher` · `nettoyer` · `desactiver` | Vocaux temporaires (voir [Vocaux temporaires](#-vocaux-temporaires-crée-ton-vocal)) |
+| `/build [apercu] [confirmer] [regles] [logs] [vocal] [economie] [texte_regles]` | Construit le serveur complet (admin) |
 | `/staffrole [rôle]` | Définit le rôle staff (admin) |
 
 ---
@@ -498,6 +556,9 @@ Les réponses se personnalisent dans `bot/constants.py` → `MAGIC8BALL_ANSWERS`
 | `/eco-admin` n'apparaît pas | Commande staff : voir [Visibilité](#-visibilité-des-commandes-staff) |
 | Le bot perd ses données | Offre gratuite Render : voir [Persistance](#-persistance-des-données) |
 | Le bot est en veille | Offre gratuite Render : `SELF_PING=true` aide à le garder éveillé, sans garantie (Render peut aussi redémarrer une instance gratuite à tout moment) |
+| `/build` répond « Permission manquante » | Donne au bot **Gérer les salons** (les salons existants ne sont pas touchés) |
+| `/build` a créé moins de salons que prévu | Relance `/build` : il complète les manquants sans doublon. Vérifie aussi la limite de 500 salons du serveur |
+| Les salons staff sont visibles par tous après `/build` | Aucun rôle staff n'était configuré : `/staffrole`, puis `/build` |
 | `Invalid token` | Token régénéré ou mal copié → mets à jour `DISCORD_TOKEN` |
 
 ---

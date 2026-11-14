@@ -232,7 +232,8 @@ class VesparaBot(commands.Bot):
                 "• `/config voir` — vérifier la configuration\n"
                 "• `/vocal installer` — activer les vocaux personnels\n"
                 "• `/eco-admin article-ajouter` — remplir la boutique\n"
-                "• `/eco-admin recompense` — rôles débloqués par niveau\n\n"
+                "• `/eco-admin recompense` — rôles débloqués par niveau\n"
+                "• `/build` — construire tout le serveur d'un coup (admin)\n\n"
                 "*Les commandes de gestion sont réservées au rôle staff.*"
             ),
             color=COLOR,

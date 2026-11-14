@@ -53,6 +53,9 @@ DEFAULT_GUILD: dict[str, Any] = {
     "shop_items": [],
     "level_rewards": [],
     "casino_channel_id": None,
+    # Structure du serveur générée par /build
+    "build_version": None,
+    "built_by": None,
 }
 
 

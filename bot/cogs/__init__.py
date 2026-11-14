@@ -9,6 +9,7 @@ EXTENSIONS = (
     "bot.cogs.fun",
     "bot.cogs.invites",
     "bot.cogs.settings",
+    "bot.cogs.build",
     "bot.cogs.tempvoice",
     "bot.cogs.economy",
     "bot.cogs.casino",
