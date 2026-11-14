@@ -66,8 +66,12 @@ class ConfirmView(discord.ui.View):
         self.value = None
 
     # ------------------------------------------------------------------ #
-    async def prompt(self, interaction: discord.Interaction, embed: discord.Embed) -> bool | None:
+    async def prompt(
+        self, interaction: discord.Interaction, embed: discord.Embed, *, timeout: float | None = None
+    ) -> bool | None:
         """Envoie la confirmation en éphémère et attend la réponse."""
+        if timeout is not None:
+            self.timeout = timeout
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed, view=self, ephemeral=True)
         else:

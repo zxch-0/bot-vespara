@@ -155,7 +155,8 @@ class ConfigGroup(app_commands.Group, name="config", description="Configurer le 
                 "`/config menu` · publier le panneau du menu\n"
                 "`/vocal installer` · installer les vocaux temporaires\n"
                 "`/eco-admin etat` · économie, boutique et niveaux\n"
-                "`/staffrole` · définir le rôle staff (admin)"
+                "`/staffrole` · définir le rôle staff (admin)\n"
+                "`/build` · construire tout le serveur (admin)"
             ),
             inline=False,
         )
